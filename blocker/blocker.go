@@ -86,7 +86,7 @@ func (f *defaultBlocker) ensureIPSet(ctx context.Context, ips []string) error {
 	return nil
 }
 
-func (f *defaultBlocker) ensureIPTable(ctx context.Context) error {
+func (f *defaultBlocker) ensureIPTable(_ context.Context) error {
 	table := "filter"
 	chain := f.getCageChain()
 	blackset := f.getBlackSet()
