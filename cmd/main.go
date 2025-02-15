@@ -6,7 +6,7 @@ import (
 	ipblackcage "ip-blackcage"
 	"ip-blackcage/blocker"
 	"ip-blackcage/config"
-	"ip-blackcage/event/ipevent"
+	"ip-blackcage/ipevent"
 	"log"
 
 	"github.com/xxxsen/common/logger"
@@ -22,7 +22,7 @@ func main() {
 		log.Fatalf("parse config failed, err:%v", err)
 	}
 	logkit := logger.Init(c.LogConfig.File, c.LogConfig.Level, int(c.LogConfig.FileCount), int(c.LogConfig.FileSize), int(c.LogConfig.KeepDays), c.LogConfig.Console)
-	ipt, err := blocker.NewIPTable(c.BlackListSet)
+	ipt, err := blocker.NewBlocker()
 	if err != nil {
 		logkit.Fatal("init blocker failed", zap.Error(err))
 	}

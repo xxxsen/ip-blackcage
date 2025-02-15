@@ -6,8 +6,9 @@ import (
 )
 
 type config struct {
-	filter blocker.IBlocker
-	obs    event.IEventReader
+	filter   blocker.IBlocker
+	obs      event.IEventReader
+	savefile string
 }
 
 type Option func(c *config)
@@ -21,6 +22,12 @@ func WithBlocker(f blocker.IBlocker) Option {
 func WithEventReader(ev event.IEventReader) Option {
 	return func(c *config) {
 		c.obs = ev
+	}
+}
+
+func WithSaveFile(f string) Option {
+	return func(c *config) {
+		c.savefile = f
 	}
 }
 

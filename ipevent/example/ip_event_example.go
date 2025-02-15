@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"ip-blackcage/event/ipevent"
+	"ip-blackcage/ipevent"
 	"log"
 )
 

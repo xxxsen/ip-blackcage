@@ -11,9 +11,10 @@ import (
 )
 
 type Config struct {
-	BlackPortList []string `json:"black_port_list"`
-	BlackListSet  string   `json:"blacklist_set"`
-	LogConfig     logger.LogConfig
+	BlackPortList []string         `json:"black_port_list"`
+	BlackListSet  string           `json:"blacklist_set"`
+	SaveFile      string           `json:"save_file"`
+	LogConfig     logger.LogConfig `json:"log_config"`
 }
 
 func (c *Config) DecodePortList() ([]uint16, error) {
