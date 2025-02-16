@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"ip-blackcage/ipset"
+	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/xxxsen/common/logutil"
@@ -139,8 +140,11 @@ func (f *defaultBlocker) Destroy(ctx context.Context) error {
 	blackset := f.getBlackSet()
 	whiteset := f.getWhiteSet()
 	if err := f.ipt.DeleteIfExists(table, "INPUT", "-j", chain); err != nil {
-		logutil.GetLogger(ctx).Error("delete chain jump rule failed", zap.Error(err))
-		//不作为失败
+		if !strings.Contains(err.Error(), "does not exist") {
+			logutil.GetLogger(ctx).Error("delete chain jump rule failed", zap.Error(err))
+			return err
+		}
+		//不存在的错误直接忽略
 	}
 	if err := f.ipt.ClearAndDeleteChain(table, chain); err != nil {
 		return fmt.Errorf("clean and delete chain failed, err:%w", err)
