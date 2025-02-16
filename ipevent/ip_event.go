@@ -2,12 +2,15 @@ package ipevent
 
 import (
 	"context"
+	"fmt"
 	"ip-blackcage/event"
 	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
+	"github.com/xxxsen/common/logutil"
+	"go.uber.org/zap"
 )
 
 type ipEventReader struct {
@@ -58,6 +61,10 @@ func (r *ipEventReader) handlePacket(packet gopacket.Packet) {
 	if _, ok := r.c.portm[uint16(tcp.DstPort)]; !ok {
 		return
 	}
+	logutil.GetLogger(context.Background()).Debug("recv port scan request",
+		zap.String("src", fmt.Sprintf("%s:%d", ip.SrcIP.String(), tcp.SrcPort)),
+		zap.String("dst", fmt.Sprintf("%s:%d", ip.DstIP.String(), tcp.DstPort)),
+	)
 	r.ipchain <- event.NewEventData(string(event.EventTypePortScan), time.Now().UnixMilli(), ip.SrcIP.String())
 }
 
