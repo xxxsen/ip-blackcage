@@ -2,22 +2,18 @@ package ipblackcage
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"ip-blackcage/model"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
-	"time"
 
 	"github.com/xxxsen/common/logutil"
 	"go.uber.org/zap"
 )
 
 type IPBlackCage struct {
-	c        *config
-	lck      sync.RWMutex
-	blackMap map[string]struct{}
+	c *config
 }
 
 func New(opts ...Option) (*IPBlackCage, error) {
@@ -28,62 +24,22 @@ func New(opts ...Option) (*IPBlackCage, error) {
 	if c.obs == nil {
 		return nil, fmt.Errorf("no observer found")
 	}
-	return &IPBlackCage{c: c, blackMap: make(map[string]struct{}, 2048)}, nil
-}
-
-func (bc *IPBlackCage) saveBlackIPData(ctx context.Context) error {
-	bc.lck.Lock()
-	ips := make([]string, 0, len(bc.blackMap))
-	for ip := range bc.blackMap {
-		ips = append(ips, ip)
-	}
-	bc.lck.Unlock()
-	raw, err := json.Marshal(&ips)
-	if err != nil {
-		return err
-	}
-	tmpfile := bc.c.savefile + "-tmp"
-	if err := os.WriteFile(tmpfile, raw, 0644); err != nil {
-		return err
-	}
-	if err := os.Rename(tmpfile, bc.c.savefile); err != nil {
-		logutil.GetLogger(ctx).Error("rename tmp file to save file failed", zap.Error(err))
-	}
-	return nil
-}
-
-func (bc *IPBlackCage) startSaveThread(ctx context.Context) {
-	if len(bc.c.savefile) == 0 {
-		return
-	}
-	ticker := time.NewTicker(5 * time.Minute)
-	for range ticker.C {
-		if err := bc.saveBlackIPData(ctx); err != nil {
-			logutil.GetLogger(ctx).Error("save black ip data failed", zap.Error(err))
-			continue
-		}
-	}
+	return &IPBlackCage{c: c}, nil
 }
 
 func (bc *IPBlackCage) initBlackList(ctx context.Context) error {
-	if len(bc.c.savefile) == 0 {
-		return nil
-	}
-	data, err := os.ReadFile(bc.c.savefile)
-	ips := make([]string, 0, 1024)
-	if err == nil {
-		if err := json.Unmarshal(data, &ips); err != nil {
-			return err
+	iplist := make([]string, 0, 1024)
+	cnt, err := bc.c.ipDao.ListBlackIP(ctx, 200, func(ctx context.Context, ips []*model.BlackCageTab) error {
+		for _, ip := range ips {
+			iplist = append(iplist, ip.IP)
 		}
-	}
-	if err != nil && !os.IsNotExist(err) {
+		return nil
+	})
+	if err != nil {
 		return err
 	}
-
-	for _, ip := range ips {
-		bc.blackMap[ip] = struct{}{}
-	}
-	if err := bc.c.filter.Init(ctx, ips); err != nil {
+	logutil.GetLogger(ctx).Info("read black ips from db succ", zap.Int64("cnt", cnt))
+	if err := bc.c.filter.Init(ctx, iplist); err != nil {
 		return err
 	}
 	return nil
@@ -114,11 +70,11 @@ func (bc *IPBlackCage) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	go bc.startSaveThread(ctx)
 	for ev := range ch {
+		evn := ev.EventType()
 		ip := ev.Data().(string)
 		ts := ev.Timestamp()
-		ok, err := bc.addToBlackList(ctx, ip)
+		ok, err := bc.addToBlackList(ctx, evn, ip, ts)
 		if err != nil {
 			logutil.GetLogger(ctx).Error("add ip to black list failed", zap.Error(err), zap.String("ip", ip))
 			continue
@@ -131,15 +87,22 @@ func (bc *IPBlackCage) Run(ctx context.Context) error {
 	return nil
 }
 
-func (bc *IPBlackCage) addToBlackList(ctx context.Context, ip string) (bool, error) {
-	bc.lck.RLock()
-	defer bc.lck.RUnlock()
-	if _, ok := bc.blackMap[ip]; ok {
+func (bc *IPBlackCage) addToBlackList(ctx context.Context, ev string, ip string, ts int64) (bool, error) {
+	_, ok, err := bc.c.ipDao.GetBlackIP(ctx, ip)
+	if err != nil {
+		return false, err
+	}
+	if ok {
 		return false, nil
 	}
 	if err := bc.c.filter.BanIP(ctx, ip); err != nil {
 		return false, err
 	}
-	bc.blackMap[ip] = struct{}{}
+	bc.c.ipDao.AddBlackIP(ctx, &model.BlackCageTab{
+		CTime:  uint64(ts),
+		MTime:  uint64(ts),
+		IP:     ip,
+		IPType: fmt.Sprintf("detect_by_event:%s", ev),
+	})
 	return true, nil
 }

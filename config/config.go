@@ -13,7 +13,7 @@ import (
 type Config struct {
 	Interface     string           `json:"interface"`
 	BlackPortList []string         `json:"black_port_list"`
-	AutoSaveFile  string           `json:"auto_save_file"`
+	DBFile        string           `json:"db_file"`
 	LogConfig     logger.LogConfig `json:"log_config"`
 }
 

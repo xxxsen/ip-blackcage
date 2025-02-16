@@ -27,10 +27,10 @@ func TestIPDBDao(t *testing.T) {
 		ips := []string{"1.2.3.4", "1.2.3.4", "2.3.4.5", "3.4.5.6"} //duplicate
 		for _, ip := range ips {
 			err := d.AddBlackIP(ctx, &model.BlackCageTab{
-				IP:        ip,
-				CTime:     uint64(time.Now().Unix()),
-				MTime:     uint64(time.Now().Unix()),
-				EventType: "test",
+				IP:     ip,
+				CTime:  uint64(time.Now().Unix()),
+				MTime:  uint64(time.Now().Unix()),
+				IPType: "test",
 			})
 			assert.NoError(t, err)
 		}

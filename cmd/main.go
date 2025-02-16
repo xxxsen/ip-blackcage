@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"flag"
 	ipblackcage "ip-blackcage"
 	"ip-blackcage/blocker"
 	"ip-blackcage/config"
+	"ip-blackcage/dao"
 	"ip-blackcage/ipevent"
 	"ip-blackcage/route"
 	"log"
 
+	_ "github.com/glebarez/go-sqlite"
 	"github.com/xxxsen/common/logger"
 	"go.uber.org/zap"
 )
@@ -46,10 +49,21 @@ func main() {
 	if err != nil {
 		logkit.Fatal("init event reader failed", zap.Error(err))
 	}
+	//初始化db
+	db, err := sql.Open("sqlite", c.DBFile)
+	if err != nil {
+		logkit.Fatal("init sqlite db failed", zap.Error(err))
+	}
+	dao.SetIPDB(db)
+	//初始化ip db dao
+	ipdao, err := dao.NewIPDBDao()
+	if err != nil {
+		logkit.Fatal("init ip db dao failed", zap.Error(err))
+	}
 	cage, err := ipblackcage.New(
 		ipblackcage.WithEventReader(evr),
 		ipblackcage.WithBlocker(ipt),
-		ipblackcage.WithAutoSaveFile(c.AutoSaveFile),
+		ipblackcage.WithIPDBDao(ipdao),
 	)
 	if err != nil {
 		logkit.Fatal("init cage failed", zap.Error(err))

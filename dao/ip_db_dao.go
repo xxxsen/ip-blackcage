@@ -39,7 +39,7 @@ func (d *ipDBDaoImpl) init() error {
 	sql := `
 CREATE TABLE IF NOT EXISTS ip_blackcage_tab (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_type TEXT NOT NULL,
+    ip_type TEXT NOT NULL,
     ctime INTEGER NOT NULL,
     mtime INTEGER NOT NULL,
     ip TEXT NOT NULL UNIQUE
@@ -59,15 +59,15 @@ func (d *ipDBDaoImpl) table() string {
 func (d *ipDBDaoImpl) AddBlackIP(ctx context.Context, bip *model.BlackCageTab) error {
 	client := d.getClient(ctx)
 
-	sql := fmt.Sprintf(`insert or ignore into %s(event_type, ctime, mtime, ip) values(?, ?, ?, ?)`, d.table())
-	if _, err := client.ExecContext(ctx, sql, bip.EventType, bip.CTime, bip.MTime, bip.IP); err != nil {
+	sql := fmt.Sprintf(`insert or ignore into %s(ip_type, ctime, mtime, ip) values(?, ?, ?, ?)`, d.table())
+	if _, err := client.ExecContext(ctx, sql, bip.IPType, bip.CTime, bip.MTime, bip.IP); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (d *ipDBDaoImpl) GetBlackIP(ctx context.Context, ip string) (*model.BlackCageTab, bool, error) {
-	sql := fmt.Sprintf("select id, event_type, ctime, mtime, ip from %s where ip = ? limit 1", d.table())
+	sql := fmt.Sprintf("select id, ip_type, ctime, mtime, ip from %s where ip = ? limit 1", d.table())
 	client := d.getClient(ctx)
 	rows, err := client.QueryContext(ctx, sql, ip)
 	if err != nil {
@@ -120,7 +120,7 @@ func (d *ipDBDaoImpl) ListBlackIP(ctx context.Context, limit int, cb ListBlackIP
 }
 
 func (d *ipDBDaoImpl) selectByScan(ctx context.Context, id int64, limit int) ([]*model.BlackCageTab, error) {
-	sql := fmt.Sprintf(`select id, event_type, ctime, mtime, ip from %s where id > ? order by id asc limit %d`, d.table(), limit)
+	sql := fmt.Sprintf(`select id, ip_type, ctime, mtime, ip from %s where id > ? order by id asc limit %d`, d.table(), limit)
 	client := d.getClient(ctx)
 	rows, err := client.QueryContext(ctx, sql, id)
 	if err != nil {
@@ -134,7 +134,7 @@ func (d *ipDBDaoImpl) scanIPBlackCageRows(rows *sql.Rows) ([]*model.BlackCageTab
 	rs := make([]*model.BlackCageTab, 0, 1)
 	for rows.Next() {
 		tab := &model.BlackCageTab{}
-		if err := rows.Scan(&tab.ID, &tab.EventType, &tab.CTime, &tab.MTime, &tab.IP); err != nil {
+		if err := rows.Scan(&tab.ID, &tab.IPType, &tab.CTime, &tab.MTime, &tab.IP); err != nil {
 			return nil, err
 		}
 		rs = append(rs, tab)
