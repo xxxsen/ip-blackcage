@@ -60,16 +60,16 @@ func (f *defaultBlocker) ensureIPSet(ctx context.Context, ips []string) error {
 	blackset := f.getBlackSet()
 	whiteset := f.getWhiteSet()
 	tmpset := f.getTmpSet(blackset)
-	if err := f.set.Create(ctx, blackset, ipset.HashNetType, ipset.WithExist()); err != nil {
+	if err := f.set.Create(ctx, blackset, ipset.SetTypeHashNet, ipset.WithExist()); err != nil {
 		return fmt.Errorf("create black set failed, err:%w", err)
 	}
-	if err := f.set.Create(ctx, whiteset, ipset.HashNetType, ipset.WithExist()); err != nil {
+	if err := f.set.Create(ctx, whiteset, ipset.SetTypeHashNet, ipset.WithExist()); err != nil {
 		return fmt.Errorf("create white set failed, err:%w", err)
 	}
 	if err := f.set.Destroy(ctx, tmpset, ipset.WithExist()); err != nil {
 		return fmt.Errorf("destroy black tmp set failed, err:%w", err)
 	}
-	if err := f.set.Create(ctx, tmpset, ipset.HashNetType, ipset.WithExist()); err != nil {
+	if err := f.set.Create(ctx, tmpset, ipset.SetTypeHashNet, ipset.WithExist()); err != nil {
 		return fmt.Errorf("create black tmp set failed, err:%w", err)
 	}
 	for _, ip := range ips {

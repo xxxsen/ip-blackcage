@@ -22,7 +22,7 @@ func TestAddAndTest(t *testing.T) {
 	ctx := context.Background()
 	setname := "test_set"
 	{
-		err = set.Create(ctx, setname, HashNetType, WithExist())
+		err = set.Create(ctx, setname, SetTypeHashNet, WithExist())
 		assert.NoError(t, err)
 	}
 	{
@@ -67,4 +67,15 @@ func TestAddAndTest(t *testing.T) {
 		assert.Error(t, err)
 	}
 
+}
+
+func TestList(t *testing.T) {
+	set := MustNew()
+	ctx := context.Background()
+	setname := "test_set"
+	err := set.Create(ctx, setname, SetTypeHashNet, WithExist())
+	assert.NoError(t, err)
+	data, err := set.List(ctx, setname, WithOutput(OutputTypeXml))
+	assert.NoError(t, err)
+	t.Logf("data:%s", string(data))
 }

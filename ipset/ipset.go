@@ -30,6 +30,14 @@ func New() (*IPSet, error) {
 	return &IPSet{path: path}, nil
 }
 
+func MustNew() *IPSet {
+	set, err := New()
+	if err != nil {
+		panic(err)
+	}
+	return set
+}
+
 func (s *IPSet) runCmd(ctx context.Context, c *config, args ...string) *errPack {
 	if len(c.params) > 0 {
 		newArgs := make([]string, 0, len(args)+len(c.params))

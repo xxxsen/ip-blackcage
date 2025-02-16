@@ -4,11 +4,11 @@ type SetType string
 type OutputType string
 
 const (
-	HashNetType SetType = "hash:net"
+	SetTypeHashNet SetType = "hash:net"
 )
 
 const (
-	OutTypePlain OutputType = "plain"
-	OutTypeSave  OutputType = "save"
-	OutTypeXml   OutputType = "xml"
+	OutputTypePlain OutputType = "plain"
+	OutputTypeSave  OutputType = "save"
+	OutputTypeXml   OutputType = "xml"
 )
