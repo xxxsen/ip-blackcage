@@ -121,8 +121,10 @@ func (bc *IPBlackCage) registerCleanBlackListSignal(ctx context.Context) error {
 		logutil.GetLogger(ctx).Info("recv stop signal, clean blocker rules", zap.Any("signal", sig.String()))
 		if err := bc.c.filter.Destroy(ctx); err != nil {
 			logutil.GetLogger(ctx).Error("clean blocker rules failed", zap.Error(err))
+			os.Exit(1)
 			return
 		}
+		os.Exit(0)
 	}()
 	return nil
 }
