@@ -7,6 +7,7 @@ import (
 	"ip-blackcage/blocker"
 	"ip-blackcage/config"
 	"ip-blackcage/ipevent"
+	"ip-blackcage/route"
 	"log"
 
 	"github.com/xxxsen/common/logger"
@@ -31,9 +32,16 @@ func main() {
 	if err != nil {
 		logkit.Fatal("decode port list failed", zap.Error(err))
 	}
+	listenInterface, err := detectValidInterface(c.Interface)
+	if err != nil {
+		logkit.Fatal("detect default network interface failed", zap.Error(err))
+	}
+	if len(c.Interface) == 0 {
+		logkit.Info("detect default network interface succ", zap.String("interface", listenInterface))
+	}
 	evr, err := ipevent.NewIPEventReader(
 		ipevent.WithEnablePortVisit(portlist),
-		ipevent.WithListenInterface(detectValidInterface()),
+		ipevent.WithListenInterface(listenInterface),
 	)
 	if err != nil {
 		logkit.Fatal("init event reader failed", zap.Error(err))
@@ -52,7 +60,9 @@ func main() {
 	}
 }
 
-func detectValidInterface() string {
-	//TODO: finish it
-	return "br0"
+func detectValidInterface(netcard string) (string, error) {
+	if len(netcard) > 0 {
+		return netcard, nil
+	}
+	return route.DetectDefaultInterface()
 }
