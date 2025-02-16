@@ -16,6 +16,7 @@ const (
 
 type IBlocker interface {
 	Init(ctx context.Context, ips []string) error
+	Destroy(ctx context.Context) error
 	BanIP(ctx context.Context, ip string) error
 	UnBanIP(ctx context.Context, ip string) error
 }
@@ -91,7 +92,7 @@ func (f *defaultBlocker) ensureIPTable(_ context.Context) error {
 	chain := f.getCageChain()
 	blackset := f.getBlackSet()
 	whiteset := f.getWhiteSet()
-	ok, err := f.ipt.Exists(table, chain)
+	ok, err := f.ipt.ChainExists(table, chain)
 	if err != nil {
 		return err
 	}
@@ -108,6 +109,10 @@ func (f *defaultBlocker) ensureIPTable(_ context.Context) error {
 		{
 			name: "skip whitelist",
 			args: []string{"-m", "set", "--match-set", whiteset, "src", "-j", "RETURN"},
+		},
+		{
+			name: "allow established",
+			args: []string{"-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"},
 		},
 		{
 			name: "drop traffic",
@@ -129,7 +134,27 @@ func (f *defaultBlocker) ensureIPTable(_ context.Context) error {
 	return nil
 }
 
+func (f *defaultBlocker) Destroy(ctx context.Context) error {
+	table := "filter"
+	chain := f.getCageChain()
+	blackset := f.getBlackSet()
+	whiteset := f.getWhiteSet()
+	if err := f.ipt.DeleteIfExists(table, "INPUT", "-j", chain); err != nil {
+		return fmt.Errorf("delete chain jump rule failed, err:%w", err)
+	}
+	if err := f.ipt.ClearAndDeleteChain(table, chain); err != nil {
+		return fmt.Errorf("clean and delete chain failed, err:%w", err)
+	}
+	_ = f.set.Destroy(ctx, blackset, ipset.WithExist())
+	_ = f.set.Destroy(ctx, whiteset, ipset.WithExist())
+	return nil
+}
+
 func (f *defaultBlocker) Init(ctx context.Context, ips []string) error {
+	if err := f.Destroy(ctx); err != nil { //先进行预处理
+		return fmt.Errorf("destroy before init failed, err:%w", err)
+	}
+
 	if err := f.ensureIPSet(ctx, ips); err != nil {
 		return err
 	}

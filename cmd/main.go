@@ -21,6 +21,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("parse config failed, err:%v", err)
 	}
+	log.Printf("config init succ, config:%+v", *c)
 	logkit := logger.Init(c.LogConfig.File, c.LogConfig.Level, int(c.LogConfig.FileCount), int(c.LogConfig.FileSize), int(c.LogConfig.KeepDays), c.LogConfig.Console)
 	ipt, err := blocker.NewBlocker()
 	if err != nil {
@@ -40,6 +41,7 @@ func main() {
 	cage, err := ipblackcage.New(
 		ipblackcage.WithEventReader(evr),
 		ipblackcage.WithBlocker(ipt),
+		ipblackcage.WithAutoSaveFile(c.AutoSaveFile),
 	)
 	if err != nil {
 		logkit.Fatal("init cage failed", zap.Error(err))
@@ -52,5 +54,5 @@ func main() {
 
 func detectValidInterface() string {
 	//TODO: finish it
-	return "eth0"
+	return "br0"
 }

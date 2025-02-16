@@ -25,7 +25,7 @@ func WithEventReader(ev event.IEventReader) Option {
 	}
 }
 
-func WithSaveFile(f string) Option {
+func WithAutoSaveFile(f string) Option {
 	return func(c *config) {
 		c.savefile = f
 	}

@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/xxxsen/common/logutil"
@@ -68,16 +70,16 @@ func (bc *IPBlackCage) initBlackList(ctx context.Context) error {
 		return nil
 	}
 	data, err := os.ReadFile(bc.c.savefile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
 	ips := make([]string, 0, 1024)
-	if err := json.Unmarshal(data, &ips); err != nil {
+	if err == nil {
+		if err := json.Unmarshal(data, &ips); err != nil {
+			return err
+		}
+	}
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
+
 	for _, ip := range ips {
 		bc.blackMap[ip] = struct{}{}
 	}
@@ -87,7 +89,24 @@ func (bc *IPBlackCage) initBlackList(ctx context.Context) error {
 	return nil
 }
 
+func (bc *IPBlackCage) registerCleanBlackListSignal(ctx context.Context) error {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-sigs
+		logutil.GetLogger(ctx).Info("recv stop signal, clean blocker rules", zap.Any("signal", sig.String()))
+		if err := bc.c.filter.Destroy(ctx); err != nil {
+			logutil.GetLogger(ctx).Error("clean blocker rules failed", zap.Error(err))
+			return
+		}
+	}()
+	return nil
+}
+
 func (bc *IPBlackCage) Run(ctx context.Context) error {
+	if err := bc.registerCleanBlackListSignal(ctx); err != nil {
+
+	}
 	if err := bc.initBlackList(ctx); err != nil {
 		return err
 	}

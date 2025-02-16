@@ -12,8 +12,7 @@ import (
 
 type Config struct {
 	BlackPortList []string         `json:"black_port_list"`
-	BlackListSet  string           `json:"blacklist_set"`
-	SaveFile      string           `json:"save_file"`
+	AutoSaveFile  string           `json:"auto_save_file"`
 	LogConfig     logger.LogConfig `json:"log_config"`
 }
 
@@ -51,9 +50,7 @@ func Parse(f string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &Config{
-		BlackListSet: "ip-blackcage",
-	}
+	c := &Config{}
 	if err := json.Unmarshal(raw, c); err != nil {
 		return nil, err
 	}
