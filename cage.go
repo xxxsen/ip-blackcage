@@ -13,6 +13,22 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	defaultIPv4LocalNetworkIPs = []string{
+		"10.0.0.0/8",
+		"127.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"100.64.0.0/10",
+		"169.254.0.0/16",
+		"192.0.2.0/24",
+		"198.51.100.0/24",
+		"203.0.113.0/24",
+		"192.88.99.0/24",
+		"224.0.0.0/4",
+	}
+)
+
 type IPBlackCage struct {
 	c *config
 }
@@ -55,6 +71,10 @@ func (bc *IPBlackCage) readListFromFiles(lst []string) ([]string, error) {
 	return rs, nil
 }
 
+func (bc *IPBlackCage) readLocalNetworkList() ([]string, error) {
+	return defaultIPv4LocalNetworkIPs, nil
+}
+
 func (bc *IPBlackCage) initCageChain(ctx context.Context) error {
 	dbBlackIPList, err := bc.readBlackListFromDB(ctx)
 	if err != nil {
@@ -68,6 +88,10 @@ func (bc *IPBlackCage) initCageChain(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("read user white ips failed, err:%w", err)
 	}
+	localNetworkList, err := bc.readLocalNetworkList()
+	if err != nil {
+		return fmt.Errorf("read user local network list failed, err:%w", err)
+	}
 
 	logutil.GetLogger(ctx).Info("read white/black ips succ",
 		zap.Int("db_black_ips", len(dbBlackIPList)),
@@ -77,8 +101,13 @@ func (bc *IPBlackCage) initCageChain(ctx context.Context) error {
 	blackList := make([]string, 0, len(dbBlackIPList)+len(userBlackIPList))
 	blackList = append(blackList, dbBlackIPList...)
 	blackList = append(blackList, userBlackIPList...)
+	whiteList := make([]string, 0, len(userWhiteIPList)+len(localNetworkList))
+	whiteList = append(whiteList, userWhiteIPList...)
+	if bc.c.bypassLocalNetwork {
+		whiteList = append(whiteList, localNetworkList...)
+	}
 
-	if err := bc.c.filter.Init(ctx, blackList, userWhiteIPList); err != nil {
+	if err := bc.c.filter.Init(ctx, blackList, whiteList); err != nil {
 		return err
 	}
 	return nil

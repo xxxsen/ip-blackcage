@@ -17,7 +17,7 @@ type Config struct {
 	LogConfig          logger.LogConfig `json:"log_config"`
 	UserIPBlackListDir string           `json:"user_ip_black_list_dir"`
 	UserIPWhiteListDir string           `json:"user_ip_white_list_dir"`
-	ByPassLocalNetwork bool             `json:"by_pass_local_network"` //放行本地网络ip, TODO: impl it
+	ByPassLocalNetwork bool             `json:"by_pass_local_network"`
 }
 
 func (c *Config) DecodePortList() ([]uint16, error) {
