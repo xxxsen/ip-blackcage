@@ -11,10 +11,13 @@ import (
 )
 
 type Config struct {
-	Interface     string           `json:"interface"`
-	BlackPortList []string         `json:"black_port_list"`
-	DBFile        string           `json:"db_file"`
-	LogConfig     logger.LogConfig `json:"log_config"`
+	Interface          string           `json:"interface"`
+	BlackPortList      []string         `json:"black_port_list"`
+	DBFile             string           `json:"db_file"`
+	LogConfig          logger.LogConfig `json:"log_config"`
+	UserIPBlackListDir string           `json:"user_ip_black_list_dir"`
+	UserIPWhiteListDir string           `json:"user_ip_white_list_dir"`
+	ByPassLocalNetwork bool             `json:"by_pass_local_network"` //放行本地网络ip, TODO: impl it
 }
 
 func (c *Config) DecodePortList() ([]uint16, error) {
@@ -51,7 +54,9 @@ func Parse(f string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &Config{}
+	c := &Config{
+		ByPassLocalNetwork: true,
+	}
 	if err := json.Unmarshal(raw, c); err != nil {
 		return nil, err
 	}

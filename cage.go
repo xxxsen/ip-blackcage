@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"ip-blackcage/model"
+	"ip-blackcage/utils"
 	"os"
 	"os/signal"
 	"syscall"
@@ -27,19 +28,57 @@ func New(opts ...Option) (*IPBlackCage, error) {
 	return &IPBlackCage{c: c}, nil
 }
 
-func (bc *IPBlackCage) initBlackList(ctx context.Context) error {
-	iplist := make([]string, 0, 1024)
-	cnt, err := bc.c.ipDao.ListBlackIP(ctx, 200, func(ctx context.Context, ips []*model.BlackCageTab) error {
+func (bc *IPBlackCage) readBlackListFromDB(ctx context.Context) ([]string, error) {
+	dbIPList := make([]string, 0, 1024)
+	//DB IP 列表
+	_, err := bc.c.ipDao.ListBlackIP(ctx, 200, func(ctx context.Context, ips []*model.BlackCageTab) error {
 		for _, ip := range ips {
-			iplist = append(iplist, ip.IP)
+			dbIPList = append(dbIPList, ip.IP)
 		}
 		return nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	logutil.GetLogger(ctx).Info("read black ips from db succ", zap.Int64("cnt", cnt))
-	if err := bc.c.filter.Init(ctx, iplist); err != nil {
+	return dbIPList, nil
+}
+
+func (bc *IPBlackCage) readListFromFiles(lst []string) ([]string, error) {
+	rs := make([]string, 0, 1024)
+	for _, ipfile := range lst {
+		ips, err := utils.ReadIPListFromFile(ipfile)
+		if err != nil {
+			return nil, fmt.Errorf("read ip list from file:%s failed, err:%w", ipfile, err)
+		}
+		rs = append(rs, ips...)
+	}
+	return rs, nil
+}
+
+func (bc *IPBlackCage) initCageChain(ctx context.Context) error {
+	dbBlackIPList, err := bc.readBlackListFromDB(ctx)
+	if err != nil {
+		return fmt.Errorf("read db black ips failed, err:%w", err)
+	}
+	userBlackIPList, err := bc.readListFromFiles(bc.c.userBlackList)
+	if err != nil {
+		return fmt.Errorf("read user black ips failed, err:%w", err)
+	}
+	userWhiteIPList, err := bc.readListFromFiles(bc.c.userWhiteList)
+	if err != nil {
+		return fmt.Errorf("read user white ips failed, err:%w", err)
+	}
+
+	logutil.GetLogger(ctx).Info("read white/black ips succ",
+		zap.Int("db_black_ips", len(dbBlackIPList)),
+		zap.Int("user_black_ips", len(userBlackIPList)),
+		zap.Int("user_white_ips", len(userWhiteIPList)),
+	)
+	blackList := make([]string, 0, len(dbBlackIPList)+len(userBlackIPList))
+	blackList = append(blackList, dbBlackIPList...)
+	blackList = append(blackList, userBlackIPList...)
+
+	if err := bc.c.filter.Init(ctx, blackList, userWhiteIPList); err != nil {
 		return err
 	}
 	return nil
@@ -63,7 +102,7 @@ func (bc *IPBlackCage) Run(ctx context.Context) error {
 	if err := bc.registerCleanBlackListSignal(ctx); err != nil {
 
 	}
-	if err := bc.initBlackList(ctx); err != nil {
+	if err := bc.initCageChain(ctx); err != nil {
 		return err
 	}
 	ch, err := bc.c.obs.Open(ctx)

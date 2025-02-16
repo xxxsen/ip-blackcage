@@ -15,10 +15,12 @@ const (
 )
 
 type IBlocker interface {
-	Init(ctx context.Context, ips []string) error
+	Init(ctx context.Context, blackips []string, whiteips []string) error
 	Destroy(ctx context.Context) error
 	BanIP(ctx context.Context, ip string) error
 	UnBanIP(ctx context.Context, ip string) error
+	WhiteIP(ctx context.Context, ip string) error
+	UnWhiteIP(ctx context.Context, ip string) error
 }
 
 type defaultBlocker struct {
@@ -57,28 +59,23 @@ func (f *defaultBlocker) getTmpSet(n string) string {
 	return n + "-tmp"
 }
 
-func (f *defaultBlocker) ensureIPSet(ctx context.Context, ips []string) error {
-	blackset := f.getBlackSet()
-	whiteset := f.getWhiteSet()
-	tmpset := f.getTmpSet(blackset)
-	if err := f.set.Create(ctx, blackset, ipset.SetTypeHashNet, ipset.WithExist()); err != nil {
-		return fmt.Errorf("create black set failed, err:%w", err)
-	}
-	if err := f.set.Create(ctx, whiteset, ipset.SetTypeHashNet, ipset.WithExist()); err != nil {
-		return fmt.Errorf("create white set failed, err:%w", err)
+func (f *defaultBlocker) ensureIPSet(ctx context.Context, setname string, ips []string) error {
+	tmpset := f.getTmpSet(setname)
+	if err := f.set.Create(ctx, setname, ipset.SetTypeHashNet, ipset.WithExist()); err != nil {
+		return fmt.Errorf("create ip set failed, err:%w", err)
 	}
 	if err := f.set.Destroy(ctx, tmpset, ipset.WithExist()); err != nil {
-		return fmt.Errorf("destroy black tmp set failed, err:%w", err)
+		return fmt.Errorf("destroy ip tmp set failed, err:%w", err)
 	}
 	if err := f.set.Create(ctx, tmpset, ipset.SetTypeHashNet, ipset.WithExist()); err != nil {
-		return fmt.Errorf("create black tmp set failed, err:%w", err)
+		return fmt.Errorf("create ip tmp set failed, err:%w", err)
 	}
 	for _, ip := range ips {
 		if err := f.set.Add(ctx, tmpset, ip); err != nil {
 			return fmt.Errorf("add ip:%s to set failed, err:%w", ip, err)
 		}
 	}
-	if err := f.set.Swap(ctx, tmpset, blackset); err != nil {
+	if err := f.set.Swap(ctx, tmpset, setname); err != nil {
 		return fmt.Errorf("swap black set failed, err:%w", err)
 	}
 	if err := f.set.Destroy(ctx, tmpset, ipset.WithExist()); err != nil {
@@ -150,13 +147,15 @@ func (f *defaultBlocker) Destroy(ctx context.Context) error {
 	return nil
 }
 
-func (f *defaultBlocker) Init(ctx context.Context, ips []string) error {
+func (f *defaultBlocker) Init(ctx context.Context, blackIps []string, whiteIps []string) error {
 	if err := f.Destroy(ctx); err != nil { //先进行预处理
 		return fmt.Errorf("destroy before init failed, err:%w", err)
 	}
-
-	if err := f.ensureIPSet(ctx, ips); err != nil {
-		return err
+	if err := f.ensureIPSet(ctx, f.getWhiteSet(), whiteIps); err != nil {
+		return fmt.Errorf("ensure white ip set failed, err:%w", err)
+	}
+	if err := f.ensureIPSet(ctx, f.getBlackSet(), blackIps); err != nil {
+		return fmt.Errorf("ensure black ip set failed, err:%w", err)
 	}
 	if err := f.ensureIPTable(ctx); err != nil {
 		return err
@@ -170,4 +169,12 @@ func (f *defaultBlocker) BanIP(ctx context.Context, ip string) error {
 
 func (f *defaultBlocker) UnBanIP(ctx context.Context, ip string) error {
 	return f.set.Del(ctx, f.getBlackSet(), ip)
+}
+
+func (f *defaultBlocker) WhiteIP(ctx context.Context, ip string) error {
+	return f.set.Add(ctx, f.getWhiteSet(), ip)
+}
+
+func (f *defaultBlocker) UnWhiteIP(ctx context.Context, ip string) error {
+	return f.set.Del(ctx, f.getWhiteSet(), ip)
 }

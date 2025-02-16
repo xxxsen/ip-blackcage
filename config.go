@@ -10,6 +10,11 @@ type config struct {
 	filter blocker.IBlocker
 	obs    event.IEventReader
 	ipDao  dao.IIPDBDao
+
+	//
+	userBlackList      []string
+	userWhiteList      []string
+	bypassLocalNetwork bool
 }
 
 type Option func(c *config)
@@ -29,6 +34,24 @@ func WithEventReader(ev event.IEventReader) Option {
 func WithIPDBDao(d dao.IIPDBDao) Option {
 	return func(c *config) {
 		c.ipDao = d
+	}
+}
+
+func WithUserIPBlackList(fs []string) Option {
+	return func(c *config) {
+		c.userBlackList = fs
+	}
+}
+
+func WithUserIPWhiteList(fs []string) Option {
+	return func(c *config) {
+		c.userWhiteList = fs
+	}
+}
+
+func WithByPassLocalNetwork(v bool) Option {
+	return func(c *config) {
+		c.bypassLocalNetwork = v
 	}
 }
 
