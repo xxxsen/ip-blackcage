@@ -84,7 +84,7 @@ func (d *ipDBDaoImpl) GetBlackIP(ctx context.Context, ip string) (*model.BlackCa
 }
 
 func (d *ipDBDaoImpl) DelBlackIP(ctx context.Context, ip string) (bool, error) {
-	sql := fmt.Sprintf(fmt.Sprintf("delete from %s where ip = ?", d.table()))
+	sql := fmt.Sprintf("delete from %s where ip = ?", d.table())
 	client := d.getClient(ctx)
 	rs, err := client.ExecContext(ctx, sql, ip)
 	if err != nil {
