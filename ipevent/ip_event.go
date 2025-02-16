@@ -58,7 +58,7 @@ func (r *ipEventReader) handlePacket(packet gopacket.Packet) {
 	if _, ok := r.c.portm[uint16(tcp.DstPort)]; !ok {
 		return
 	}
-	r.ipchain <- event.NewEventData(time.Now().UnixMilli(), ip.SrcIP.String())
+	r.ipchain <- event.NewEventData(string(event.EventTypePortScan), time.Now().UnixMilli(), ip.SrcIP.String())
 }
 
 func (r *ipEventReader) Open(ctx context.Context) (<-chan event.IEventData, error) {

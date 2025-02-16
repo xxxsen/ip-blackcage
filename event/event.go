@@ -3,11 +3,13 @@ package event
 import "context"
 
 type IEventData interface {
+	EventType() string
 	Timestamp() int64
 	Data() interface{}
 }
 
 type defaultEventData struct {
+	typ  string
 	ts   int64
 	data interface{}
 }
@@ -20,8 +22,12 @@ func (d defaultEventData) Data() interface{} {
 	return d.data
 }
 
-func NewEventData(ts int64, data interface{}) IEventData {
-	return defaultEventData{ts: ts, data: data}
+func (d defaultEventData) EventType() string {
+	return d.typ
+}
+
+func NewEventData(typ string, ts int64, data interface{}) IEventData {
+	return defaultEventData{typ: typ, ts: ts, data: data}
 }
 
 type IEventReader interface {
