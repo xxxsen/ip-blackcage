@@ -37,5 +37,6 @@ services:
       - ./data:/data
     restart: always
     command: --config=/config/config.json
+    network_mode: "host"
 ```
 

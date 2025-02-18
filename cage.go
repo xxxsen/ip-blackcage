@@ -160,25 +160,21 @@ func (bc *IPBlackCage) Run(ctx context.Context) error {
 		evn := ev.EventType()
 		ipdata := ev.Data().(*ipevent.IPEventData)
 		ts := ev.Timestamp()
+		logger := logutil.GetLogger(ctx).With(zap.String("src", fmt.Sprintf("%s:%d", ipdata.SrcIP, ipdata.SrcPort)), zap.String("dst", fmt.Sprintf("%s:%d", ipdata.DstIP, ipdata.DstPort)))
 		if !bc.checkShouldBanIP(ctx, ipdata) {
-			logutil.GetLogger(ctx).Debug("check should ban ip, no need to ban", zap.String("src_ip", ipdata.SrcIP), zap.Uint16("dst_port", ipdata.DstPort))
+			logger.Error("no need to ban")
 			continue
 		}
 
 		ok, err := bc.addToBlackList(ctx, evn, ipdata, ts)
 		if err != nil {
-			logutil.GetLogger(ctx).Error("add ip to black list failed", zap.Error(err), zap.String("ip", ipdata.SrcIP))
+			logger.Error("add ip to black list failed", zap.Error(err))
 			continue
 		}
 		if !ok {
 			continue
 		}
-		logutil.GetLogger(ctx).Info("add ip to black list succ",
-			zap.String("ip", ipdata.SrcIP),
-			zap.Uint16("src_port", ipdata.SrcPort),
-			zap.Uint16("visit_port", ipdata.DstPort),
-			zap.Int64("ts", ts),
-		)
+		logger.Info("add ip to black list succ", zap.Int64("ts", ts))
 	}
 	return nil
 }
