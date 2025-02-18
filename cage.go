@@ -133,13 +133,12 @@ func (bc *IPBlackCage) registerCleanBlackListSignal(ctx context.Context) error {
 	return nil
 }
 
-func (bc *IPBlackCage) checkShouldBanIP(ctx context.Context, ipdata *ipevent.IPEventData) bool {
+func (bc *IPBlackCage) checkShouldBanIP(_ context.Context, ipdata *ipevent.IPEventData) bool {
 	if ipdata.SrcIP == ipdata.DstIP {
 		return false
 	}
-	exist, err := bc.whiteListFilter.IsContains(ipdata.SrcIP)
+	exist, err := bc.whiteListFilter.IsContains(ipdata.DstIP)
 	if err != nil {
-		logutil.GetLogger(ctx).Error("check ip in default white list failed", zap.Error(err), zap.String("src_ip", ipdata.SrcIP))
 		return true
 	}
 	return !exist
