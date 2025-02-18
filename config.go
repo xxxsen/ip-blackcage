@@ -12,9 +12,8 @@ type config struct {
 	ipDao  dao.IIPDBDao
 
 	//
-	userBlackList      []string
-	userWhiteList      []string
-	bypassLocalNetwork bool
+	userBlackList []string
+	userWhiteList []string
 }
 
 type Option func(c *config)
@@ -46,12 +45,6 @@ func WithUserIPBlackList(fs []string) Option {
 func WithUserIPWhiteList(fs []string) Option {
 	return func(c *config) {
 		c.userWhiteList = fs
-	}
-}
-
-func WithByPassLocalNetwork(v bool) Option {
-	return func(c *config) {
-		c.bypassLocalNetwork = v
 	}
 }
 

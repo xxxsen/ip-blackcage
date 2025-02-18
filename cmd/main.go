@@ -80,7 +80,6 @@ func main() {
 		ipblackcage.WithIPDBDao(ipdao),
 		ipblackcage.WithUserIPBlackList(ublist),
 		ipblackcage.WithUserIPWhiteList(uwlist),
-		ipblackcage.WithByPassLocalNetwork(c.ByPassLocalNetwork),
 	)
 	if err != nil {
 		logkit.Fatal("init cage failed", zap.Error(err))

@@ -103,9 +103,7 @@ func (bc *IPBlackCage) initCageChain(ctx context.Context) error {
 	blackList = append(blackList, userBlackIPList...)
 	whiteList := make([]string, 0, len(userWhiteIPList)+len(localNetworkList))
 	whiteList = append(whiteList, userWhiteIPList...)
-	if bc.c.bypassLocalNetwork {
-		whiteList = append(whiteList, localNetworkList...)
-	}
+	whiteList = append(whiteList, localNetworkList...)
 
 	if err := bc.c.filter.Init(ctx, blackList, whiteList); err != nil {
 		return err

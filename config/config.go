@@ -17,7 +17,6 @@ type Config struct {
 	LogConfig          logger.LogConfig `json:"log_config"`
 	UserIPBlackListDir string           `json:"user_ip_black_list_dir"`
 	UserIPWhiteListDir string           `json:"user_ip_white_list_dir"`
-	ByPassLocalNetwork bool             `json:"by_pass_local_network"`
 }
 
 func (c *Config) DecodePortList() ([]uint16, error) {
@@ -54,9 +53,7 @@ func Parse(f string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &Config{
-		ByPassLocalNetwork: true,
-	}
+	c := &Config{}
 	if err := json.Unmarshal(raw, c); err != nil {
 		return nil, err
 	}
