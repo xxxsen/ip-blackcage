@@ -179,7 +179,7 @@ func (bc *IPBlackCage) Run(ctx context.Context) error {
 	return nil
 }
 
-func (bc *IPBlackCage) addToBlackList(ctx context.Context, ev string, ipdata *ipevent.IPEventData, ts int64) (bool, error) {
+func (bc *IPBlackCage) addToBlackList(ctx context.Context, ev string, ipdata *ipevent.IPEventData, _ int64) (bool, error) {
 	_, ok, err := bc.c.ipDao.GetBlackIP(ctx, ipdata.SrcIP)
 	if err != nil {
 		return false, err
