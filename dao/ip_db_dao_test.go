@@ -6,7 +6,6 @@ import (
 	"ip-blackcage/model"
 	"os"
 	"testing"
-	"time"
 
 	_ "github.com/glebarez/go-sqlite"
 	"github.com/google/uuid"
@@ -24,14 +23,11 @@ func TestIPDBDao(t *testing.T) {
 	assert.NoError(t, err)
 	ctx := context.Background()
 	{ //插入数据
-		ips := []string{"1.2.3.4", "1.2.3.4", "2.3.4.5", "3.4.5.6"} //duplicate
+		ips := []string{"1.2.3.4", "2.3.4.5", "3.4.5.6"} //duplicate
 		for _, ip := range ips {
-			err := d.AddBlackIP(ctx, &model.BlackCageTab{
-				IP:     ip,
-				CTime:  uint64(time.Now().Unix()),
-				MTime:  uint64(time.Now().Unix()),
-				IPType: "test",
-			})
+			err := d.AddBlackIP(ctx, ip, "test")
+			assert.NoError(t, err)
+			err = d.IncrBlackIPVisit(ctx, ip)
 			assert.NoError(t, err)
 		}
 	}
@@ -40,6 +36,7 @@ func TestIPDBDao(t *testing.T) {
 		cnt, err := d.ListBlackIP(ctx, limit, func(ctx context.Context, ips []*model.BlackCageTab) error {
 			for _, ip := range ips {
 				t.Logf("recv ip item:%v", *ip)
+				assert.Equal(t, int64(2), ip.Counter)
 			}
 			return nil
 		})

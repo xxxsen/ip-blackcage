@@ -184,17 +184,13 @@ func (bc *IPBlackCage) addToBlackList(ctx context.Context, ev string, ipdata *ip
 	if err != nil {
 		return false, err
 	}
-	if ok {
+	if ok { // 已经存在了, 那么更新计数
+		_ = bc.c.ipDao.IncrBlackIPVisit(ctx, ipdata.SrcIP)
 		return false, nil
 	}
 	if err := bc.c.filter.BanIP(ctx, ipdata.SrcIP); err != nil {
 		return false, err
 	}
-	bc.c.ipDao.AddBlackIP(ctx, &model.BlackCageTab{
-		CTime:  uint64(ts),
-		MTime:  uint64(ts),
-		IP:     ipdata.SrcIP,
-		IPType: fmt.Sprintf("detect_by_event:%s", ev),
-	})
+	bc.c.ipDao.AddBlackIP(ctx, ipdata.SrcIP, fmt.Sprintf("detect_by_event:%s|%d", ev, ipdata.DstPort))
 	return true, nil
 }

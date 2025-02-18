@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"ip-blackcage/dao/db"
 	"ip-blackcage/model"
+	"time"
 )
 
 type ListBlackIPCallback func(ctx context.Context, ips []*model.BlackCageTab) error
 
 type IIPDBDao interface {
-	AddBlackIP(ctx context.Context, bip *model.BlackCageTab) error
+	AddBlackIP(ctx context.Context, ip string, remark string) error
+	IncrBlackIPVisit(ctx context.Context, ip string) error
 	GetBlackIP(ctx context.Context, ip string) (*model.BlackCageTab, bool, error)
 	DelBlackIP(ctx context.Context, ip string) (bool, error)
 	ListBlackIP(ctx context.Context, limit int, cb ListBlackIPCallback) (int64, error)
@@ -39,10 +41,11 @@ func (d *ipDBDaoImpl) init() error {
 	sql := `
 CREATE TABLE IF NOT EXISTS ip_blackcage_tab (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ip_type TEXT NOT NULL,
+    remark TEXT NOT NULL,
     ctime INTEGER NOT NULL,
     mtime INTEGER NOT NULL,
-    ip TEXT NOT NULL UNIQUE
+    ip TEXT NOT NULL UNIQUE,
+	counter INTEGER NOT NULL
 );
 `
 	_, err := d.getClient(context.Background()).ExecContext(context.Background(), sql)
@@ -56,18 +59,28 @@ func (d *ipDBDaoImpl) table() string {
 	return "ip_blackcage_tab"
 }
 
-func (d *ipDBDaoImpl) AddBlackIP(ctx context.Context, bip *model.BlackCageTab) error {
+func (d *ipDBDaoImpl) AddBlackIP(ctx context.Context, ip string, remark string) error {
 	client := d.getClient(ctx)
+	now := time.Now().UnixMilli()
+	sql := fmt.Sprintf(`insert or ignore into %s(remark, ctime, mtime, ip, counter) values(?, ?, ?, ?, ?)`, d.table())
+	if _, err := client.ExecContext(ctx, sql, remark, now, now, ip, 1); err != nil {
+		return err
+	}
+	return nil
+}
 
-	sql := fmt.Sprintf(`insert or ignore into %s(ip_type, ctime, mtime, ip) values(?, ?, ?, ?)`, d.table())
-	if _, err := client.ExecContext(ctx, sql, bip.IPType, bip.CTime, bip.MTime, bip.IP); err != nil {
+func (d *ipDBDaoImpl) IncrBlackIPVisit(ctx context.Context, ip string) error {
+	client := d.getClient(ctx)
+	now := time.Now().UnixMilli()
+	sql := fmt.Sprintf("update %s set counter = counter + 1, mtime = ? where ip = ?", d.table())
+	if _, err := client.ExecContext(ctx, sql, now, ip); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (d *ipDBDaoImpl) GetBlackIP(ctx context.Context, ip string) (*model.BlackCageTab, bool, error) {
-	sql := fmt.Sprintf("select id, ip_type, ctime, mtime, ip from %s where ip = ? limit 1", d.table())
+	sql := fmt.Sprintf("select id, remark, ctime, mtime, ip, counter from %s where ip = ? limit 1", d.table())
 	client := d.getClient(ctx)
 	rows, err := client.QueryContext(ctx, sql, ip)
 	if err != nil {
@@ -120,7 +133,7 @@ func (d *ipDBDaoImpl) ListBlackIP(ctx context.Context, limit int, cb ListBlackIP
 }
 
 func (d *ipDBDaoImpl) selectByScan(ctx context.Context, id int64, limit int) ([]*model.BlackCageTab, error) {
-	sql := fmt.Sprintf(`select id, ip_type, ctime, mtime, ip from %s where id > ? order by id asc limit %d`, d.table(), limit)
+	sql := fmt.Sprintf(`select id, remark, ctime, mtime, ip, counter from %s where id > ? order by id asc limit %d`, d.table(), limit)
 	client := d.getClient(ctx)
 	rows, err := client.QueryContext(ctx, sql, id)
 	if err != nil {
@@ -134,7 +147,7 @@ func (d *ipDBDaoImpl) scanIPBlackCageRows(rows *sql.Rows) ([]*model.BlackCageTab
 	rs := make([]*model.BlackCageTab, 0, 1)
 	for rows.Next() {
 		tab := &model.BlackCageTab{}
-		if err := rows.Scan(&tab.ID, &tab.IPType, &tab.CTime, &tab.MTime, &tab.IP); err != nil {
+		if err := rows.Scan(&tab.ID, &tab.Remark, &tab.CTime, &tab.MTime, &tab.IP, &tab.Counter); err != nil {
 			return nil, err
 		}
 		rs = append(rs, tab)
