@@ -159,6 +159,9 @@ func (bc *IPBlackCage) Run(ctx context.Context) error {
 		evn := ev.EventType()
 		ipdata := ev.Data().(*ipevent.IPEventData)
 		ts := ev.Timestamp()
+		if _, ok := bc.c.skipIps[ipdata.SrcIP]; ok { // 如果为自身出站ip, 直接跳过, 这种是自己向外发起请求
+			continue
+		}
 		logger := logutil.GetLogger(ctx).With(zap.String("src", fmt.Sprintf("%s:%d", ipdata.SrcIP, ipdata.SrcPort)), zap.String("dst", fmt.Sprintf("%s:%d", ipdata.DstIP, ipdata.DstPort)))
 		if !bc.checkShouldBanIP(ctx, ipdata) {
 			logger.Error("no need to ban")

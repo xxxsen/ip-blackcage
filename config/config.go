@@ -12,6 +12,7 @@ import (
 
 type Config struct {
 	Interface          string           `json:"interface"`
+	ExitIPs            []string         `json:"exit_ips"`
 	BlackPortList      []string         `json:"black_port_list"`
 	DBFile             string           `json:"db_file"`
 	LogConfig          logger.LogConfig `json:"log_config"`

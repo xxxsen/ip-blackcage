@@ -57,6 +57,9 @@ func (r *ipEventReader) handlePacket(packet gopacket.Packet) {
 	}
 
 	tcp, _ := tcpLayer.(*layers.TCP)
+	if !tcp.SYN { //
+		return
+	}
 
 	if _, ok := r.c.portm[uint16(tcp.DstPort)]; !ok {
 		return

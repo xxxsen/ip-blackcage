@@ -80,6 +80,7 @@ func main() {
 		ipblackcage.WithIPDBDao(ipdao),
 		ipblackcage.WithUserIPBlackList(ublist),
 		ipblackcage.WithUserIPWhiteList(uwlist),
+		ipblackcage.WithSkipIPs(c.ExitIPs...),
 	)
 	if err != nil {
 		logkit.Fatal("init cage failed", zap.Error(err))
