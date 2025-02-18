@@ -3,6 +3,7 @@ package ipblackcage
 import (
 	"context"
 	"fmt"
+	"ip-blackcage/ipevent"
 	"ip-blackcage/model"
 	"ip-blackcage/utils"
 	"os"
@@ -30,7 +31,8 @@ var (
 )
 
 type IPBlackCage struct {
-	c *config
+	c               *config
+	whiteListFilter *ipNetFilter
 }
 
 func New(opts ...Option) (*IPBlackCage, error) {
@@ -41,7 +43,11 @@ func New(opts ...Option) (*IPBlackCage, error) {
 	if c.obs == nil {
 		return nil, fmt.Errorf("no observer found")
 	}
-	return &IPBlackCage{c: c}, nil
+	filter := newIPNetFilter()
+	if err := filter.AddRule(defaultIPv4LocalNetworkIPs...); err != nil {
+		return nil, err
+	}
+	return &IPBlackCage{c: c, whiteListFilter: filter}, nil
 }
 
 func (bc *IPBlackCage) readBlackListFromDB(ctx context.Context) ([]string, error) {
@@ -127,6 +133,18 @@ func (bc *IPBlackCage) registerCleanBlackListSignal(ctx context.Context) error {
 	return nil
 }
 
+func (bc *IPBlackCage) checkShouldBanIP(ctx context.Context, ipdata *ipevent.IPEventData) bool {
+	if ipdata.SrcIP == ipdata.DstIP {
+		return false
+	}
+	exist, err := bc.whiteListFilter.IsContains(ipdata.SrcIP)
+	if err != nil {
+		logutil.GetLogger(ctx).Error("check ip in default white list failed", zap.Error(err), zap.String("src_ip", ipdata.SrcIP))
+		return true
+	}
+	return !exist
+}
+
 func (bc *IPBlackCage) Run(ctx context.Context) error {
 	if err := bc.registerCleanBlackListSignal(ctx); err != nil {
 
@@ -140,36 +158,46 @@ func (bc *IPBlackCage) Run(ctx context.Context) error {
 	}
 	for ev := range ch {
 		evn := ev.EventType()
-		ip := ev.Data().(string)
+		ipdata := ev.Data().(*ipevent.IPEventData)
 		ts := ev.Timestamp()
-		ok, err := bc.addToBlackList(ctx, evn, ip, ts)
+		if !bc.checkShouldBanIP(ctx, ipdata) {
+			logutil.GetLogger(ctx).Debug("check should ban ip, no need to ban", zap.String("src_ip", ipdata.SrcIP), zap.Uint16("dst_port", ipdata.DstPort))
+			continue
+		}
+
+		ok, err := bc.addToBlackList(ctx, evn, ipdata, ts)
 		if err != nil {
-			logutil.GetLogger(ctx).Error("add ip to black list failed", zap.Error(err), zap.String("ip", ip))
+			logutil.GetLogger(ctx).Error("add ip to black list failed", zap.Error(err), zap.String("ip", ipdata.SrcIP))
 			continue
 		}
 		if !ok {
 			continue
 		}
-		logutil.GetLogger(ctx).Info("add ip to black list succ", zap.String("ip", ip), zap.Int64("ts", ts))
+		logutil.GetLogger(ctx).Info("add ip to black list succ",
+			zap.String("ip", ipdata.SrcIP),
+			zap.Uint16("src_port", ipdata.SrcPort),
+			zap.Uint16("visit_port", ipdata.DstPort),
+			zap.Int64("ts", ts),
+		)
 	}
 	return nil
 }
 
-func (bc *IPBlackCage) addToBlackList(ctx context.Context, ev string, ip string, ts int64) (bool, error) {
-	_, ok, err := bc.c.ipDao.GetBlackIP(ctx, ip)
+func (bc *IPBlackCage) addToBlackList(ctx context.Context, ev string, ipdata *ipevent.IPEventData, ts int64) (bool, error) {
+	_, ok, err := bc.c.ipDao.GetBlackIP(ctx, ipdata.SrcIP)
 	if err != nil {
 		return false, err
 	}
 	if ok {
 		return false, nil
 	}
-	if err := bc.c.filter.BanIP(ctx, ip); err != nil {
+	if err := bc.c.filter.BanIP(ctx, ipdata.SrcIP); err != nil {
 		return false, err
 	}
 	bc.c.ipDao.AddBlackIP(ctx, &model.BlackCageTab{
 		CTime:  uint64(ts),
 		MTime:  uint64(ts),
-		IP:     ip,
+		IP:     ipdata.SrcIP,
 		IPType: fmt.Sprintf("detect_by_event:%s", ev),
 	})
 	return true, nil

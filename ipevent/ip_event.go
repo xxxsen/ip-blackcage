@@ -65,7 +65,16 @@ func (r *ipEventReader) handlePacket(packet gopacket.Packet) {
 		zap.String("src", fmt.Sprintf("%s:%d", ip.SrcIP.String(), tcp.SrcPort)),
 		zap.String("dst", fmt.Sprintf("%s:%d", ip.DstIP.String(), tcp.DstPort)),
 	)
-	r.ipchain <- event.NewEventData(string(event.EventTypePortScan), time.Now().UnixMilli(), ip.SrcIP.String())
+	r.ipchain <- event.NewEventData(
+		string(event.EventTypePortScan),
+		time.Now().UnixMilli(),
+		&IPEventData{
+			SrcIP:   ip.SrcIP.String(),
+			DstIP:   ip.DstIP.String(),
+			SrcPort: uint16(tcp.SrcPort),
+			DstPort: uint16(tcp.DstPort),
+		},
+	)
 }
 
 func (r *ipEventReader) Open(ctx context.Context) (<-chan event.IEventData, error) {
