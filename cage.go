@@ -3,12 +3,10 @@ package ipblackcage
 import (
 	"context"
 	"fmt"
+	"ip-blackcage/event"
 	"ip-blackcage/ipevent"
 	"ip-blackcage/model"
 	"ip-blackcage/utils"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/xxxsen/common/logutil"
 	"go.uber.org/zap"
@@ -31,8 +29,8 @@ var (
 )
 
 type IPBlackCage struct {
-	c               *config
-	whiteListFilter *ipNetFilter
+	c    *config
+	done chan bool
 }
 
 func New(opts ...Option) (*IPBlackCage, error) {
@@ -43,11 +41,7 @@ func New(opts ...Option) (*IPBlackCage, error) {
 	if c.obs == nil {
 		return nil, fmt.Errorf("no observer found")
 	}
-	filter := newIPNetFilter()
-	if err := filter.AddRule(defaultIPv4LocalNetworkIPs...); err != nil {
-		return nil, err
-	}
-	return &IPBlackCage{c: c, whiteListFilter: filter}, nil
+	return &IPBlackCage{c: c, done: make(chan bool)}, nil
 }
 
 func (bc *IPBlackCage) readBlackListFromDB(ctx context.Context) ([]string, error) {
@@ -117,37 +111,28 @@ func (bc *IPBlackCage) initCageChain(ctx context.Context) error {
 	return nil
 }
 
-func (bc *IPBlackCage) registerCleanBlackListSignal(ctx context.Context) error {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-sigs
-		logutil.GetLogger(ctx).Info("recv stop signal, clean blocker rules", zap.Any("signal", sig.String()))
-		if err := bc.c.filter.Destroy(ctx); err != nil {
-			logutil.GetLogger(ctx).Error("clean blocker rules failed", zap.Error(err))
-			os.Exit(1)
-			return
-		}
-		os.Exit(0)
-	}()
+func (bc *IPBlackCage) checkShouldBanIP(_ context.Context, ipdata *ipevent.IPEventData) bool {
+	if ipdata.SrcIP == ipdata.DstIP { //自己访问自己, 虽然下一条规则也可以规避
+		return false
+	}
+	if _, ok := bc.c.exitIps[ipdata.SrcIP]; ok { // 如果为自身出站ip, 直接跳过, 这种是自己向外发起请求
+		return false
+	}
+	return true
+}
+
+func (bc *IPBlackCage) Stop(ctx context.Context) error {
+	logutil.GetLogger(ctx).Debug("start handle stop action")
+	close(bc.done)
+	<-bc.done //wait
+	if err := bc.c.filter.Destroy(ctx); err != nil {
+		logutil.GetLogger(ctx).Error("clean blocker rules failed", zap.Error(err))
+	}
+	logutil.GetLogger(ctx).Debug("handle stop action finish")
 	return nil
 }
 
-func (bc *IPBlackCage) checkShouldBanIP(_ context.Context, ipdata *ipevent.IPEventData) bool {
-	if ipdata.SrcIP == ipdata.DstIP {
-		return false
-	}
-	exist, err := bc.whiteListFilter.IsContains(ipdata.DstIP)
-	if err != nil {
-		return true
-	}
-	return !exist
-}
-
-func (bc *IPBlackCage) Run(ctx context.Context) error {
-	if err := bc.registerCleanBlackListSignal(ctx); err != nil {
-
-	}
+func (bc *IPBlackCage) Start(ctx context.Context) error {
 	if err := bc.initCageChain(ctx); err != nil {
 		return err
 	}
@@ -155,33 +140,48 @@ func (bc *IPBlackCage) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for ev := range ch {
-		evn := ev.EventType()
-		ipdata := ev.Data().(*ipevent.IPEventData)
-		ts := ev.Timestamp()
-		if _, ok := bc.c.exitIps[ipdata.SrcIP]; ok { // 如果为自身出站ip, 直接跳过, 这种是自己向外发起请求
-			continue
-		}
-		logger := logutil.GetLogger(ctx).With(zap.String("src", fmt.Sprintf("%s:%d", ipdata.SrcIP, ipdata.SrcPort)), zap.String("dst", fmt.Sprintf("%s:%d", ipdata.DstIP, ipdata.DstPort)))
-		if !bc.checkShouldBanIP(ctx, ipdata) {
-			logger.Error("no need to ban")
-			continue
-		}
-		if bc.c.viewMode {
-			logger.Debug("view mode open, skip next")
-			continue
-		}
+	go bc.startHandleEvent(ctx, ch)
+	return nil
+}
 
-		ok, err := bc.addToBlackList(ctx, evn, ipdata, ts)
-		if err != nil {
-			logger.Error("add ip to black list failed", zap.Error(err))
-			continue
+func (bc *IPBlackCage) startHandleEvent(ctx context.Context, ch <-chan event.IEventData) {
+	for {
+		select {
+		case ev := <-ch:
+			if err := bc.handleOneEvent(ctx, ev); err != nil {
+				logutil.GetLogger(ctx).Error("handle event failed", zap.Error(err), zap.String("ev_type", ev.EventType()), zap.Int64("ts", ev.Timestamp()))
+				continue
+			}
+		case <-bc.done:
+			logutil.GetLogger(ctx).Debug("event loop exit")
+			return
 		}
-		if !ok {
-			continue
-		}
-		logger.Info("add ip to black list succ", zap.Int64("ts", ts))
 	}
+}
+
+func (bc *IPBlackCage) handleOneEvent(ctx context.Context, ev event.IEventData) error {
+	evn := ev.EventType()
+	ipdata := ev.Data().(*ipevent.IPEventData)
+	ts := ev.Timestamp()
+
+	if !bc.checkShouldBanIP(ctx, ipdata) {
+		return nil
+	}
+	logger := logutil.GetLogger(ctx).With(zap.String("src", fmt.Sprintf("%s:%d", ipdata.SrcIP, ipdata.SrcPort)), zap.String("dst", fmt.Sprintf("%s:%d", ipdata.DstIP, ipdata.DstPort)))
+	if bc.c.viewMode {
+		logger.Debug("view mode open, skip next")
+		return nil
+	}
+
+	isNew, err := bc.addToBlackList(ctx, evn, ipdata, ts)
+	if err != nil {
+		logger.Error("add ip to black list failed", zap.Error(err))
+		return err
+	}
+	if !isNew {
+		return nil
+	}
+	logger.Info("add ip to black list succ", zap.Int64("ts", ts))
 	return nil
 }
 

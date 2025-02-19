@@ -13,11 +13,14 @@ import (
 	"ip-blackcage/utils"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	_ "github.com/glebarez/go-sqlite"
 	"github.com/xxxsen/common/logger"
+	"github.com/xxxsen/common/logutil"
 	"go.uber.org/zap"
 )
 
@@ -87,9 +90,11 @@ func main() {
 		logkit.Fatal("init cage failed", zap.Error(err))
 	}
 	logkit.Info("start cage...")
-	if err := cage.Run(context.Background()); err != nil {
+	ctx := context.Background()
+	if err := cage.Start(ctx); err != nil {
 		logkit.Fatal("run cage failed", zap.Error(err))
 	}
+	waitSignalAndExit(ctx, cage)
 }
 
 func rebuildExitIfaceName(netc *config.NetConfig) error {
@@ -141,4 +146,17 @@ func initDB(f string) error {
 	}
 	dao.SetIPDB(db)
 	return nil
+}
+
+func waitSignalAndExit(ctx context.Context, cage *ipblackcage.IPBlackCage) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	sig := <-sigs
+	logutil.GetLogger(ctx).Info("recv stop signal, stop ip cage", zap.Any("signal", sig.String()))
+	if err := cage.Stop(ctx); err != nil {
+		logutil.GetLogger(ctx).Error("stop cage failed", zap.Error(err))
+		os.Exit(1)
+		return
+	}
+	os.Exit(0)
 }
