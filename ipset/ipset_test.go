@@ -79,3 +79,18 @@ func TestList(t *testing.T) {
 	assert.NoError(t, err)
 	t.Logf("data:%s", string(data))
 }
+
+func TestCidr(t *testing.T) {
+	set := MustNew()
+	setname := "test_set"
+	ctx := context.Background()
+	err := set.Create(ctx, setname, SetTypeHashNet, WithExist())
+	assert.NoError(t, err)
+	defer set.Destroy(ctx, setname, WithExist())
+	err = set.Add(ctx, setname, "62.133.47.0/24")
+	assert.NoError(t, err)
+	err = set.Add(ctx, setname, "62.133.47.0/24", WithExist())
+	assert.NoError(t, err)
+	err = set.Add(ctx, setname, "62.133.47.0/24")
+	assert.Error(t, err)
+}

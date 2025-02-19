@@ -74,7 +74,7 @@ func (f *defaultBlocker) ensureIPSet(ctx context.Context, setname string, ips []
 		return fmt.Errorf("create ip tmp set failed, err:%w", err)
 	}
 	for _, ip := range ips {
-		if err := f.set.Add(ctx, tmpset, ip); err != nil {
+		if err := f.set.Add(ctx, tmpset, ip, ipset.WithExist()); err != nil {
 			return fmt.Errorf("add ip:%s to set failed, err:%w", ip, err)
 		}
 	}
