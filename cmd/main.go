@@ -56,6 +56,7 @@ func main() {
 	evr, err := ipevent.NewIPEventReader(
 		ipevent.WithEnablePortVisit(portlist),
 		ipevent.WithExitIface(c.NetConfig.Interface),
+		ipevent.WithExitIps(c.NetConfig.ExitIPs),
 	)
 	if err != nil {
 		logkit.Fatal("init event reader failed", zap.Error(err))
@@ -83,7 +84,6 @@ func main() {
 		ipblackcage.WithIPDBDao(ipdao),
 		ipblackcage.WithUserIPBlackList(ublist),
 		ipblackcage.WithUserIPWhiteList(uwlist),
-		ipblackcage.WithExitIPs(c.NetConfig.ExitIPs...),
 		ipblackcage.WithViewMode(c.ViewMode),
 	)
 	if err != nil {

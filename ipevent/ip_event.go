@@ -19,13 +19,7 @@ type ipEventReader struct {
 }
 
 func NewIPEventReader(opts ...Option) (event.IEventReader, error) {
-	c := &config{
-		iface: "eth0",
-		portm: make(map[uint16]struct{}),
-	}
-	for _, opt := range opts {
-		opt(c)
-	}
+	c := applyOpts(opts...)
 	r := &ipEventReader{c: c, ipchain: make(chan event.IEventData, 1024)}
 	handler, err := pcap.OpenLive(r.c.iface, 1600, true, pcap.BlockForever)
 	if err != nil {
@@ -49,8 +43,13 @@ func (r *ipEventReader) handlePacket(packet gopacket.Packet) {
 	if ipLayer == nil {
 		return
 	}
-
 	ip, _ := ipLayer.(*layers.IPv4)
+
+	//主动发起请求
+	if _, ok := r.c.exitIps[ip.SrcIP.String()]; ok {
+		return
+	}
+
 	tcpLayer := packet.Layer(layers.LayerTypeTCP)
 	if tcpLayer == nil {
 		return
@@ -61,7 +60,7 @@ func (r *ipEventReader) handlePacket(packet gopacket.Packet) {
 		return
 	}
 
-	if _, ok := r.c.portm[uint16(tcp.DstPort)]; !ok {
+	if _, ok := r.c.portMap[uint16(tcp.DstPort)]; !ok {
 		return
 	}
 	logutil.GetLogger(context.Background()).Debug("recv port scan request",

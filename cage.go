@@ -111,13 +111,8 @@ func (bc *IPBlackCage) initCageChain(ctx context.Context) error {
 	return nil
 }
 
-func (bc *IPBlackCage) checkShouldBanIP(_ context.Context, ipdata *ipevent.IPEventData) bool {
-	if ipdata.SrcIP == ipdata.DstIP { //自己访问自己, 虽然下一条规则也可以规避
-		return false
-	}
-	if _, ok := bc.c.exitIps[ipdata.SrcIP]; ok { // 如果为自身出站ip, 直接跳过, 这种是自己向外发起请求
-		return false
-	}
+func (bc *IPBlackCage) checkShouldBanIPByRules(_ context.Context, ipdata *ipevent.IPEventData) bool {
+	//TODO: 在这里添加其他杂七杂八的规则
 	return true
 }
 
@@ -164,7 +159,7 @@ func (bc *IPBlackCage) handleOneEvent(ctx context.Context, ev event.IEventData) 
 	ipdata := ev.Data().(*ipevent.IPEventData)
 	ts := ev.Timestamp()
 
-	if !bc.checkShouldBanIP(ctx, ipdata) {
+	if !bc.checkShouldBanIPByRules(ctx, ipdata) {
 		return nil
 	}
 	logger := logutil.GetLogger(ctx).With(zap.String("src", fmt.Sprintf("%s:%d", ipdata.SrcIP, ipdata.SrcPort)), zap.String("dst", fmt.Sprintf("%s:%d", ipdata.DstIP, ipdata.DstPort)))
