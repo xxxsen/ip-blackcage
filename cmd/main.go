@@ -10,6 +10,7 @@ import (
 	"ip-blackcage/dao"
 	"ip-blackcage/ipevent"
 	"ip-blackcage/route"
+	"ip-blackcage/utils"
 	"log"
 	"os"
 	"path/filepath"
@@ -28,8 +29,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("parse config failed, err:%v", err)
 	}
-	log.Printf("config init succ, config:%+v", *c)
 	logkit := logger.Init(c.LogConfig.File, c.LogConfig.Level, int(c.LogConfig.FileCount), int(c.LogConfig.FileSize), int(c.LogConfig.KeepDays), c.LogConfig.Console)
+	logkit.Info("config init succ", zap.Any("config", c))
 	//初始化ip blocker
 	ipt, err := blocker.NewBlocker()
 	if err != nil {
@@ -39,28 +40,27 @@ func main() {
 	if err != nil {
 		logkit.Fatal("decode port list failed", zap.Error(err))
 	}
-	//探测当前的出口网卡
-	listenInterface, err := detectValidInterface(c.Interface)
-	if err != nil {
-		logkit.Fatal("detect default network interface failed", zap.Error(err))
+	//重建当前的出口网卡/ip
+	if err := rebuildExitIfaceName(&c.NetConfig); err != nil {
+		logkit.Fatal("rebuild exit iface name failed", zap.Error(err))
 	}
-	if len(c.Interface) == 0 {
-		logkit.Info("detect default network interface succ", zap.String("interface", listenInterface))
+	if err := rebuildExitIPs(&c.NetConfig); err != nil {
+		logkit.Fatal("rebuild exit ips failed", zap.Error(err))
 	}
+	logkit.Info("use exit iface name", zap.String("name", c.NetConfig.Interface))
+	logkit.Info("use exit ips", zap.Strings("ips", c.NetConfig.ExitIPs))
 	//初始化ip事件读取器
 	evr, err := ipevent.NewIPEventReader(
 		ipevent.WithEnablePortVisit(portlist),
-		ipevent.WithListenInterface(listenInterface),
+		ipevent.WithExitIface(c.NetConfig.Interface),
 	)
 	if err != nil {
 		logkit.Fatal("init event reader failed", zap.Error(err))
 	}
 	//初始化db
-	db, err := sql.Open("sqlite", c.DBFile)
-	if err != nil {
-		logkit.Fatal("init sqlite db failed", zap.Error(err))
+	if err := initDB(c.DBFile); err != nil {
+		logkit.Fatal("init db failed", zap.Error(err))
 	}
-	dao.SetIPDB(db)
 	//初始化ip db dao
 	ipdao, err := dao.NewIPDBDao()
 	if err != nil {
@@ -80,7 +80,8 @@ func main() {
 		ipblackcage.WithIPDBDao(ipdao),
 		ipblackcage.WithUserIPBlackList(ublist),
 		ipblackcage.WithUserIPWhiteList(uwlist),
-		ipblackcage.WithSkipIPs(c.ExitIPs...),
+		ipblackcage.WithExitIPs(c.NetConfig.ExitIPs...),
+		ipblackcage.WithViewMode(c.ViewMode),
 	)
 	if err != nil {
 		logkit.Fatal("init cage failed", zap.Error(err))
@@ -91,11 +92,25 @@ func main() {
 	}
 }
 
-func detectValidInterface(netcard string) (string, error) {
-	if len(netcard) > 0 {
-		return netcard, nil
+func rebuildExitIfaceName(netc *config.NetConfig) error {
+	if len(netc.Interface) > 0 {
+		return nil
 	}
-	return route.DetectDefaultInterface()
+	iface, err := route.DetectExitInterface()
+	if err != nil {
+		return err
+	}
+	netc.Interface = iface
+	return nil
+}
+
+func rebuildExitIPs(netc *config.NetConfig) error {
+	ips, err := route.ReadExitIP(netc.Interface)
+	if err != nil {
+		return err
+	}
+	netc.ExitIPs = utils.StringSliceDedup(append(ips, netc.ExitIPs...))
+	return nil
 }
 
 func resolveUserFile(dir string, prefix string) ([]string, error) {
@@ -117,4 +132,13 @@ func resolveUserFile(dir string, prefix string) ([]string, error) {
 		}
 	}
 	return rs, nil
+}
+
+func initDB(f string) error {
+	db, err := sql.Open("sqlite", f)
+	if err != nil {
+		return err
+	}
+	dao.SetIPDB(db)
+	return nil
 }

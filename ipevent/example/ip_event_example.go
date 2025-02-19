@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	ev, err := ipevent.NewIPEventReader(ipevent.WithEnablePortVisit([]uint16{2048}), ipevent.WithListenInterface("br0"))
+	ev, err := ipevent.NewIPEventReader(ipevent.WithEnablePortVisit([]uint16{2048}), ipevent.WithExitIface("br0"))
 	if err != nil {
 		panic(err)
 	}

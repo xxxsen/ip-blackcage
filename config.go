@@ -7,10 +7,11 @@ import (
 )
 
 type config struct {
-	filter  blocker.IBlocker
-	obs     event.IEventReader
-	ipDao   dao.IIPDBDao
-	skipIps map[string]struct{}
+	filter   blocker.IBlocker
+	obs      event.IEventReader
+	ipDao    dao.IIPDBDao
+	exitIps  map[string]struct{}
+	viewMode bool
 
 	//
 	userBlackList []string
@@ -51,7 +52,7 @@ func WithUserIPWhiteList(fs []string) Option {
 
 func applyOpts(opts ...Option) *config {
 	c := &config{
-		skipIps: make(map[string]struct{}),
+		exitIps: make(map[string]struct{}),
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -59,10 +60,16 @@ func applyOpts(opts ...Option) *config {
 	return c
 }
 
-func WithSkipIPs(ips ...string) Option {
+func WithExitIPs(ips ...string) Option {
 	return func(c *config) {
 		for _, ip := range ips {
-			c.skipIps[ip] = struct{}{}
+			c.exitIps[ip] = struct{}{}
 		}
+	}
+}
+
+func WithViewMode(viewmode bool) Option {
+	return func(c *config) {
+		c.viewMode = viewmode
 	}
 }

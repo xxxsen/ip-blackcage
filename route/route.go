@@ -7,7 +7,7 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-func DetectDefaultInterface() (string, error) {
+func DetectExitInterface() (string, error) {
 	lst, err := netlink.RouteList(nil, netlink.FAMILY_V4)
 	if err != nil {
 		return "", err
@@ -29,4 +29,20 @@ func DetectDefaultInterface() (string, error) {
 		return ifacename, nil
 	}
 	return "", fmt.Errorf("unable to found default network interface")
+}
+
+func ReadExitIP(ifaceName string) ([]string, error) {
+	link, err := netlink.LinkByName(ifaceName)
+	if err != nil {
+		return nil, err
+	}
+	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+	if err != nil {
+		return nil, err
+	}
+	rs := make([]string, 0, len(addrs))
+	for _, addr := range addrs {
+		rs = append(rs, addr.IP.String())
+	}
+	return rs, nil
 }

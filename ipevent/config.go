@@ -1,8 +1,8 @@
 package ipevent
 
 type config struct {
-	interface_ string
-	portm      map[uint16]struct{}
+	iface string
+	portm map[uint16]struct{}
 }
 
 type Option func(c *config)
@@ -15,8 +15,8 @@ func WithEnablePortVisit(ports []uint16) Option {
 	}
 }
 
-func WithListenInterface(interface_ string) Option {
+func WithExitIface(iface string) Option {
 	return func(c *config) {
-		c.interface_ = interface_
+		c.iface = iface
 	}
 }

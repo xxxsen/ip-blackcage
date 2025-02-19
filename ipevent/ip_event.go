@@ -20,14 +20,14 @@ type ipEventReader struct {
 
 func NewIPEventReader(opts ...Option) (event.IEventReader, error) {
 	c := &config{
-		interface_: "eth0",
-		portm:      make(map[uint16]struct{}),
+		iface: "eth0",
+		portm: make(map[uint16]struct{}),
 	}
 	for _, opt := range opts {
 		opt(c)
 	}
 	r := &ipEventReader{c: c, ipchain: make(chan event.IEventData, 1024)}
-	handler, err := pcap.OpenLive(r.c.interface_, 1600, true, pcap.BlockForever)
+	handler, err := pcap.OpenLive(r.c.iface, 1600, true, pcap.BlockForever)
 	if err != nil {
 		return nil, err
 	}

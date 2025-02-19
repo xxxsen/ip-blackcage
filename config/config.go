@@ -10,14 +10,19 @@ import (
 	"github.com/xxxsen/common/logger"
 )
 
+type NetConfig struct {
+	Interface string   `json:"interface"`
+	ExitIPs   []string `json:"exit_ips"`
+}
+
 type Config struct {
-	Interface          string           `json:"interface"`
-	ExitIPs            []string         `json:"exit_ips"`
+	NetConfig          NetConfig        `json:"net_config"`
 	BlackPortList      []string         `json:"black_port_list"`
 	DBFile             string           `json:"db_file"`
 	LogConfig          logger.LogConfig `json:"log_config"`
 	UserIPBlackListDir string           `json:"user_ip_black_list_dir"`
 	UserIPWhiteListDir string           `json:"user_ip_white_list_dir"`
+	ViewMode           bool             `json:"view_mode"`
 }
 
 func (c *Config) DecodePortList() ([]uint16, error) {
