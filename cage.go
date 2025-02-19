@@ -111,7 +111,7 @@ func (bc *IPBlackCage) initCageChain(ctx context.Context) error {
 	return nil
 }
 
-func (bc *IPBlackCage) checkShouldBanIPByRules(_ context.Context, ipdata *ipevent.IPEventData) bool {
+func (bc *IPBlackCage) checkShouldBanIPByRules(_ context.Context, _ *ipevent.IPEventData) bool {
 	//TODO: 在这里添加其他杂七杂八的规则
 	return true
 }
