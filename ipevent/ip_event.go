@@ -45,6 +45,9 @@ func (r *ipEventReader) decodeNetInfo(packet gopacket.Packet) (string, string, u
 		if nl == nil {
 			return false
 		}
+		if nl.LayerType() == layers.LayerTypeIPv6 { // 先不处理ipv6
+			return false
+		}
 		srcip, dstip = nl.NetworkFlow().Endpoints()
 		tpl := packet.TransportLayer()
 		if tpl == nil {
