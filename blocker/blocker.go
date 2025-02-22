@@ -12,9 +12,11 @@ import (
 )
 
 const (
-	defaultBlackSet  = "ip-blackcage-blacklist-set"
-	defaultWhiteSet  = "ip-blackcage-whitelist-set"
-	defaultCageChain = "ip-blackcage-chain"
+	defaultBlackSet        = "ip-blackcage-blacklist-set"
+	defaultWhiteSet        = "ip-blackcage-whitelist-set"
+	defaultFilterTable     = "filter"
+	defaultCageChain       = "ip-blackcage-chain"
+	defaultDockerUserChain = "DOCKER-USER"
 )
 
 type IBlocker interface {
@@ -50,10 +52,6 @@ func (f *defaultBlocker) getBlackSet() string {
 	return defaultBlackSet
 }
 
-func (f *defaultBlocker) getCageChain() string {
-	return defaultCageChain
-}
-
 func (f *defaultBlocker) getWhiteSet() string {
 	return defaultWhiteSet
 }
@@ -87,9 +85,9 @@ func (f *defaultBlocker) ensureIPSet(ctx context.Context, setname string, ips []
 	return nil
 }
 
-func (f *defaultBlocker) ensureIPTable(_ context.Context) error {
-	table := "filter"
-	chain := f.getCageChain()
+func (f *defaultBlocker) ensureInputChain(_ context.Context) error {
+	table := defaultFilterTable
+	chain := defaultCageChain
 	blackset := f.getBlackSet()
 	whiteset := f.getWhiteSet()
 	ok, err := f.ipt.ChainExists(table, chain)
@@ -134,14 +132,51 @@ func (f *defaultBlocker) ensureIPTable(_ context.Context) error {
 	return nil
 }
 
+func (f *defaultBlocker) ensureDockerChain(_ context.Context) error {
+	table := defaultFilterTable
+	chain := defaultCageChain
+	dockerchain := defaultDockerUserChain
+	ok, err := f.ipt.ChainExists(table, dockerchain)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		if err := f.ipt.NewChain(table, dockerchain); err != nil {
+			return err
+		}
+	}
+	if err = f.ipt.InsertUnique(table, dockerchain, 1, "-j", chain); err != nil {
+		return fmt.Errorf("append docker chain failed, err:%w", err)
+	}
+	return nil
+}
+
+func (f *defaultBlocker) ensureIPTable(ctx context.Context) error {
+	if err := f.ensureInputChain(ctx); err != nil {
+		return fmt.Errorf("ensure input chain failed, err:%w", err)
+	}
+	if err := f.ensureDockerChain(ctx); err != nil {
+		return fmt.Errorf("ensure docker chain failed, err:%w", err)
+	}
+	return nil
+}
+
 func (f *defaultBlocker) Destroy(ctx context.Context) error {
-	table := "filter"
-	chain := f.getCageChain()
+	table := defaultFilterTable
+	chain := defaultCageChain
 	blackset := f.getBlackSet()
 	whiteset := f.getWhiteSet()
+	//移除docker-user链上的处理流程
+	if err := f.ipt.DeleteIfExists(table, defaultDockerUserChain, "-j", chain); err != nil {
+		if !strings.Contains(err.Error(), "does not exist") {
+			logutil.GetLogger(ctx).Error("delete docker-user chain jump rule failed", zap.Error(err))
+			return err
+		}
+	}
+	//移除input链上的处理流程
 	if err := f.ipt.DeleteIfExists(table, "INPUT", "-j", chain); err != nil {
 		if !strings.Contains(err.Error(), "does not exist") {
-			logutil.GetLogger(ctx).Error("delete chain jump rule failed", zap.Error(err))
+			logutil.GetLogger(ctx).Error("delete input chain jump rule failed", zap.Error(err))
 			return err
 		}
 		//不存在的错误直接忽略
