@@ -206,7 +206,7 @@ func (f *defaultBlocker) Init(ctx context.Context, blackIps []string, whiteIps [
 }
 
 func (f *defaultBlocker) BanIP(ctx context.Context, ip string) error {
-	return f.set.Add(ctx, f.getBlackSet(), ip)
+	return f.set.Add(ctx, f.getBlackSet(), ip, ipset.WithExist())
 }
 
 func (f *defaultBlocker) UnBanIP(ctx context.Context, ip string) error {
@@ -214,7 +214,7 @@ func (f *defaultBlocker) UnBanIP(ctx context.Context, ip string) error {
 }
 
 func (f *defaultBlocker) WhiteIP(ctx context.Context, ip string) error {
-	return f.set.Add(ctx, f.getWhiteSet(), ip)
+	return f.set.Add(ctx, f.getWhiteSet(), ip, ipset.WithExist())
 }
 
 func (f *defaultBlocker) UnWhiteIP(ctx context.Context, ip string) error {
