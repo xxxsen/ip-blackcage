@@ -41,7 +41,13 @@ func (d *ipDBDaoImpl) getClient(ctx context.Context) db.IDatabase {
 }
 
 func (d *ipDBDaoImpl) init() error {
-	sql := `
+	initItems := []struct {
+		name string
+		sql  string
+	}{
+		{
+			name: "create table",
+			sql: `
 CREATE TABLE IF NOT EXISTS ip_blackcage_tab (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     remark TEXT NOT NULL,
@@ -50,10 +56,19 @@ CREATE TABLE IF NOT EXISTS ip_blackcage_tab (
     ip TEXT NOT NULL UNIQUE,
 	counter INTEGER NOT NULL
 );
-`
-	_, err := d.getClient(context.Background()).ExecContext(context.Background(), sql)
-	if err != nil {
-		return err
+`,
+		},
+		{
+			name: "add_mtime_index",
+			sql:  "CREATE INDEX IF NOT EXISTS idx_mtime ON ip_blackcage_tab(mtime);",
+		},
+	}
+	for _, item := range initItems {
+		if _, err := d.getClient(context.Background()).
+			ExecContext(context.Background(), item.sql); err != nil {
+
+			return fmt.Errorf("exec sql failed, job:%s, err:%w", item.name, err)
+		}
 	}
 	return nil
 }
