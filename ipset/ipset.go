@@ -120,7 +120,7 @@ func (s *IPSet) Restore(ctx context.Context, set string, ips []string, opts ...C
 		buf.WriteString(fmt.Sprintf("add %s %s -exist\n", set, ip))
 	}
 	tmpDir := os.TempDir()
-	tmpName := "blackips-" + uuid.NewString()
+	tmpName := "tmp-blackips-" + uuid.NewString()
 	tmpPath := filepath.Join(tmpDir, tmpName)
 	defer os.RemoveAll(tmpPath)
 	if err := os.WriteFile(tmpPath, buf.Bytes(), 0644); err != nil {
