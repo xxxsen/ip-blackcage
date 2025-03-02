@@ -16,7 +16,7 @@ ip黑名单, 用于把扫描ip ban掉。
         "console": true
     },
     "user_ip_black_list_dir": "/blacklist", //用户自定义的黑名单列表存储目录, 文件使用`blacklist-`开头, 一行一个ip
-    "user_ip_white_list_dir": "/whitelist" //用户自定义的黑名单列表存储目录, 文件使用`whitelist-`开头, 一行一个ip
+    "user_ip_white_list_dir": "/whitelist" //用户自定义的白名单列表存储目录, 文件使用`whitelist-`开头, 一行一个ip
 }
 ```
 
