@@ -36,7 +36,9 @@ func main() {
 	logkit := logger.Init(c.LogConfig.File, c.LogConfig.Level, int(c.LogConfig.FileCount), int(c.LogConfig.FileSize), int(c.LogConfig.KeepDays), c.LogConfig.Console)
 	logkit.Info("config init succ", zap.Any("config", c))
 	//初始化ip blocker
-	ipt, err := blocker.NewBlocker()
+	ipt, err := blocker.NewBlocker(
+		blocker.WithCageSize(c.CageSize),
+	)
 	if err != nil {
 		logkit.Fatal("init blocker failed", zap.Error(err))
 	}

@@ -31,9 +31,11 @@ type IBlocker interface {
 type defaultBlocker struct {
 	ipt *iptables.IPTables
 	set *ipset.IPSet
+	c   *config
 }
 
-func NewBlocker() (IBlocker, error) {
+func NewBlocker(opts ...Option) (IBlocker, error) {
+	c := applyOpts(opts...)
 	set, err := ipset.New()
 	if err != nil {
 		return nil, err
@@ -45,6 +47,7 @@ func NewBlocker() (IBlocker, error) {
 	return &defaultBlocker{
 		ipt: ipt,
 		set: set,
+		c:   c,
 	}, nil
 }
 
@@ -62,13 +65,13 @@ func (f *defaultBlocker) getTmpSet(n string) string {
 
 func (f *defaultBlocker) ensureIPSet(ctx context.Context, setname string, ips []string) error {
 	tmpset := f.getTmpSet(setname)
-	if err := f.set.Create(ctx, setname, ipset.SetTypeHashNet, ipset.WithExist()); err != nil {
+	if err := f.set.Create(ctx, setname, ipset.SetTypeHashNet, ipset.WithMaxElement(f.c.cageSize), ipset.WithExist()); err != nil {
 		return fmt.Errorf("create ip set failed, err:%w", err)
 	}
 	if err := f.set.Destroy(ctx, tmpset, ipset.WithExist()); err != nil {
 		return fmt.Errorf("destroy ip tmp set failed, err:%w", err)
 	}
-	if err := f.set.Create(ctx, tmpset, ipset.SetTypeHashNet, ipset.WithExist()); err != nil {
+	if err := f.set.Create(ctx, tmpset, ipset.SetTypeHashNet, ipset.WithMaxElement(f.c.cageSize), ipset.WithExist()); err != nil {
 		return fmt.Errorf("create ip tmp set failed, err:%w", err)
 	}
 	if err := f.set.Restore(ctx, tmpset, ips); err != nil {

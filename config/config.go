@@ -25,6 +25,7 @@ type Config struct {
 	ViewMode                   bool             `json:"view_mode"`
 	BanTime                    uint64           `json:"ban_time"`
 	DisableLocalNetworkProtect bool             `json:"disable_local_network_protect"`
+	CageSize                   uint64           `json:"cage_size"`
 }
 
 func (c *Config) DecodePortList() ([]uint16, error) {
@@ -62,7 +63,8 @@ func Parse(f string) (*Config, error) {
 		return nil, err
 	}
 	c := &Config{
-		BanTime: 3 * 30 * 86400, // 90d
+		BanTime:  3 * 30 * 86400, // 90d
+		CageSize: 100000,
 	}
 	if err := json.Unmarshal(raw, c); err != nil {
 		return nil, err

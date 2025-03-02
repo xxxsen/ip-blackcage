@@ -1,5 +1,7 @@
 package ipset
 
+import "strconv"
+
 type config struct {
 	params []string
 }
@@ -56,6 +58,12 @@ func WithTerse() CmdOption {
 func WithFile(fname string) CmdOption {
 	return func(c *config) {
 		c.addParam("-file", fname)
+	}
+}
+
+func WithMaxElement(sz uint64) CmdOption {
+	return func(c *config) {
+		c.addParam("maxelem", strconv.FormatUint(sz, 10))
 	}
 }
 

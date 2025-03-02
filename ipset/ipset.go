@@ -120,14 +120,16 @@ func (s *IPSet) Restore(ctx context.Context, set string, ips []string, opts ...C
 		buf.WriteString(fmt.Sprintf("add %s %s -exist\n", set, ip))
 	}
 	tmpDir := os.TempDir()
-	tmpName := "tmp-blackips-" + uuid.NewString()
+	tmpName := "tmp-ips-" + uuid.NewString()
 	tmpPath := filepath.Join(tmpDir, tmpName)
 	defer os.RemoveAll(tmpPath)
 	if err := os.WriteFile(tmpPath, buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("write black list to tmp file failed, err:%w", err)
 	}
-	if err := s.runCmdNoData(ctx, applyOpts(opts...), "restore", "-f", tmpPath); err != nil {
-		return err
+	pack := s.runCmd(ctx, applyOpts(opts...), "restore", "-f", tmpPath)
+	if pack.err != nil {
+		return fmt.Errorf("restore failed, err:%w, stdout:%s, stderr:%s",
+			pack.err, string(pack.stdout), string(pack.stderr))
 	}
 	return nil
 

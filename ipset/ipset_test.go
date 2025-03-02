@@ -119,3 +119,12 @@ func TestRestore(t *testing.T) {
 	err = set.Restore(ctx, setname, []string{"5.5.5.5", "5.5.5.6", "5.5.5.7", "6.6.6.0/10"})
 	assert.NoError(t, err)
 }
+
+func TestCreateWithMaxElem(t *testing.T) {
+	set := MustNew()
+	setname := "test_set"
+	ctx := context.Background()
+	err := set.Create(ctx, setname, SetTypeHashNet, WithExist(), WithMaxElement(10))
+	assert.NoError(t, err)
+	defer set.Destroy(ctx, setname)
+}
