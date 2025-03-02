@@ -86,7 +86,8 @@ func main() {
 		ipblackcage.WithUserIPBlackList(ublist),
 		ipblackcage.WithUserIPWhiteList(uwlist),
 		ipblackcage.WithViewMode(c.ViewMode),
-		ipblackcage.WithExpireTime(time.Duration(c.BanTime)*time.Second),
+		ipblackcage.WithBanTime(time.Duration(c.BanTime)*time.Second),
+		ipblackcage.WithDisableLocalNetworkProtect(c.DisableLocalNetworkProtect),
 	)
 	if err != nil {
 		logkit.Fatal("init cage failed", zap.Error(err))

@@ -48,7 +48,7 @@ func New(opts ...Option) (*IPBlackCage, error) {
 func (bc *IPBlackCage) readBlackListFromDB(ctx context.Context) ([]string, error) {
 	dbIPList := make([]string, 0, 1024)
 	//DB IP 列表
-	delims := uint64(time.Now().Add(-1 * bc.c.expireTime).UnixMilli())
+	delims := uint64(time.Now().Add(-1 * bc.c.banTime).UnixMilli())
 	_, err := bc.c.ipDao.ScanBlackIP(ctx, 200, func(ctx context.Context, ips []*model.BlackCageTab) error {
 		for _, ip := range ips {
 			//仅提取满足条件的黑名单ip
@@ -97,6 +97,9 @@ func (bc *IPBlackCage) initCageChain(ctx context.Context) error {
 	localNetworkList, err := bc.readLocalNetworkList()
 	if err != nil {
 		return fmt.Errorf("read user local network list failed, err:%w", err)
+	}
+	if bc.c.disableLocalNetworkProtect {
+		localNetworkList = nil
 	}
 
 	logutil.GetLogger(ctx).Info("read white/black ips succ",
@@ -167,7 +170,7 @@ func (bc *IPBlackCage) startHandleEvent(ctx context.Context, ch <-chan event.IEv
 }
 
 func (bc *IPBlackCage) unBanExpire(ctx context.Context) error {
-	delims := uint64(time.Now().Add(-1 * bc.c.expireTime).UnixMilli())
+	delims := uint64(time.Now().Add(-1 * bc.c.banTime).UnixMilli())
 	ips, err := bc.c.ipDao.ListBlackIP(ctx, &model.ListBlackIPCondition{
 		MtimeBetween: []uint64{0, delims},
 	}, 0, 100)

@@ -16,14 +16,15 @@ type NetConfig struct {
 }
 
 type Config struct {
-	NetConfig          NetConfig        `json:"net_config"`
-	BlackPortList      []string         `json:"black_port_list"`
-	DBFile             string           `json:"db_file"`
-	LogConfig          logger.LogConfig `json:"log_config"`
-	UserIPBlackListDir string           `json:"user_ip_black_list_dir"`
-	UserIPWhiteListDir string           `json:"user_ip_white_list_dir"`
-	ViewMode           bool             `json:"view_mode"`
-	BanTime            uint64           `json:"ban_time"`
+	NetConfig                  NetConfig        `json:"net_config"`
+	BlackPortList              []string         `json:"black_port_list"`
+	DBFile                     string           `json:"db_file"`
+	LogConfig                  logger.LogConfig `json:"log_config"`
+	UserIPBlackListDir         string           `json:"user_ip_black_list_dir"`
+	UserIPWhiteListDir         string           `json:"user_ip_white_list_dir"`
+	ViewMode                   bool             `json:"view_mode"`
+	BanTime                    uint64           `json:"ban_time"`
+	DisableLocalNetworkProtect bool             `json:"disable_local_network_protect"`
 }
 
 func (c *Config) DecodePortList() ([]uint16, error) {

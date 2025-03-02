@@ -8,11 +8,12 @@ import (
 )
 
 type config struct {
-	filter     blocker.IBlocker
-	obs        event.IEventReader
-	ipDao      dao.IIPDBDao
-	viewMode   bool
-	expireTime time.Duration
+	filter                     blocker.IBlocker
+	obs                        event.IEventReader
+	ipDao                      dao.IIPDBDao
+	viewMode                   bool
+	banTime                    time.Duration
+	disableLocalNetworkProtect bool
 
 	//
 	userBlackList []string
@@ -65,8 +66,14 @@ func WithViewMode(viewmode bool) Option {
 	}
 }
 
-func WithExpireTime(ts time.Duration) Option {
+func WithBanTime(ts time.Duration) Option {
 	return func(c *config) {
-		c.expireTime = ts
+		c.banTime = ts
+	}
+}
+
+func WithDisableLocalNetworkProtect(v bool) Option {
+	return func(c *config) {
+		c.disableLocalNetworkProtect = v
 	}
 }
