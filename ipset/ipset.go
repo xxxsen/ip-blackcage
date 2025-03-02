@@ -3,9 +3,14 @@ package ipset
 import (
 	"bytes"
 	"context"
+	"encoding/xml"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
+
+	"github.com/google/uuid"
 )
 
 var (
@@ -80,12 +85,52 @@ func (s *IPSet) Del(ctx context.Context, set string, data string, opts ...CmdOpt
 	return s.runCmdNoData(ctx, applyOpts(opts...), "del", set, data)
 }
 
-func (s *IPSet) List(ctx context.Context, set string, opts ...CmdOption) ([]byte, error) {
+func (s *IPSet) ListRaw(ctx context.Context, set string, opts ...CmdOption) ([]byte, error) {
 	pack := s.runCmd(ctx, applyOpts(opts...), "list", set)
 	if pack.err != nil {
 		return nil, pack.err
 	}
 	return pack.stdout, nil
+}
+
+func (s *IPSet) List(ctx context.Context, set string) (*Header, []string, error) {
+	raw, err := s.ListRaw(ctx, set, WithOutput("xml"))
+	if err != nil {
+		return nil, nil, err
+	}
+	var ipsets Ipsets
+	if err := xml.Unmarshal(raw, &ipsets); err != nil {
+		return nil, nil, err
+	}
+	if len(ipsets.Ipset) == 0 {
+		return nil, nil, fmt.Errorf("invalid ipset output struct, no ipset data")
+	}
+	ipset := ipsets.Ipset[0]
+	ips := make([]string, 0, len(ipset.Members.Member))
+	for _, item := range ipset.Members.Member {
+		ips = append(ips, item.Elem)
+	}
+	return &ipset.Header, ips, nil
+
+}
+
+func (s *IPSet) Restore(ctx context.Context, set string, ips []string, opts ...CmdOption) error {
+	buf := bytes.Buffer{}
+	for _, ip := range ips {
+		buf.WriteString(fmt.Sprintf("add %s %s -exist\n", set, ip))
+	}
+	tmpDir := os.TempDir()
+	tmpName := "blackips-" + uuid.NewString()
+	tmpPath := filepath.Join(tmpDir, tmpName)
+	defer os.RemoveAll(tmpPath)
+	if err := os.WriteFile(tmpPath, buf.Bytes(), 0644); err != nil {
+		return fmt.Errorf("write black list to tmp file failed, err:%w", err)
+	}
+	if err := s.runCmdNoData(ctx, applyOpts(opts...), "restore", "-f", tmpPath); err != nil {
+		return err
+	}
+	return nil
+
 }
 
 func (s *IPSet) Test(ctx context.Context, set string, data string, opts ...CmdOption) (bool, error) {

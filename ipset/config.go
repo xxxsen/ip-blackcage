@@ -16,7 +16,7 @@ func WithExist() CmdOption {
 	}
 }
 
-// -exist | -output { plain | save | xml } | -quiet | -resolve | -sorted | -name |  -terse  |  -file filename
+// -output { plain | save | xml }
 func WithOutput(typ OutputType) CmdOption {
 	return func(c *config) {
 		c.addParam("-output", string(typ))

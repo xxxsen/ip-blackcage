@@ -69,15 +69,29 @@ func TestAddAndTest(t *testing.T) {
 
 }
 
+func TestListRaw(t *testing.T) {
+	set := MustNew()
+	ctx := context.Background()
+	setname := "test_set"
+	err := set.Create(ctx, setname, SetTypeHashNet, WithExist())
+	assert.NoError(t, err)
+	data, err := set.ListRaw(ctx, setname, WithOutput(OutputTypeXml))
+	assert.NoError(t, err)
+	t.Logf("data:%s", string(data))
+}
+
 func TestList(t *testing.T) {
 	set := MustNew()
 	ctx := context.Background()
 	setname := "test_set"
 	err := set.Create(ctx, setname, SetTypeHashNet, WithExist())
 	assert.NoError(t, err)
-	data, err := set.List(ctx, setname, WithOutput(OutputTypeXml))
+	defer set.Destroy(ctx, setname)
+	set.Add(ctx, setname, "1.2.3.4", WithExist())
+	header, ips, err := set.List(ctx, setname)
 	assert.NoError(t, err)
-	t.Logf("data:%s", string(data))
+	t.Logf("header:%+v", *header)
+	t.Logf("ips:%+v", ips)
 }
 
 func TestCidr(t *testing.T) {
@@ -93,4 +107,15 @@ func TestCidr(t *testing.T) {
 	assert.NoError(t, err)
 	err = set.Add(ctx, setname, "62.133.47.0/24")
 	assert.Error(t, err)
+}
+
+func TestRestore(t *testing.T) {
+	set := MustNew()
+	setname := "test_restore"
+	ctx := context.Background()
+	err := set.Create(ctx, setname, SetTypeHashNet, WithExist())
+	assert.NoError(t, err)
+	defer set.Destroy(ctx, setname)
+	err = set.Restore(ctx, setname, []string{"5.5.5.5", "5.5.5.6", "5.5.5.7", "6.6.6.0/10"})
+	assert.NoError(t, err)
 }
