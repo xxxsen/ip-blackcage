@@ -149,7 +149,8 @@ func (bc *IPBlackCage) Start(ctx context.Context) error {
 }
 
 func (bc *IPBlackCage) startHandleEvent(ctx context.Context, ch <-chan event.IEventData) {
-	unBanTicker := time.NewTimer(1 * time.Minute)
+	unBanTicker := time.NewTicker(1 * time.Minute)
+	defer unBanTicker.Stop()
 	for {
 		select {
 		case ev := <-ch:

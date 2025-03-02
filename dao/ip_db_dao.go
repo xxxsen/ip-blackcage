@@ -100,8 +100,7 @@ func (d *ipDBDaoImpl) GetBlackIP(ctx context.Context, ip string) (*model.BlackCa
 
 func (d *ipDBDaoImpl) DelBlackIP(ctx context.Context, ip string) (bool, error) {
 	where := map[string]interface{}{
-		"ip":     ip,
-		"_limit": []uint{0, 1},
+		"ip": ip,
 	}
 	sql, args, err := builder.BuildDelete(d.table(), where)
 	if err != nil {
