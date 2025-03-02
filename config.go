@@ -4,13 +4,15 @@ import (
 	"ip-blackcage/blocker"
 	"ip-blackcage/dao"
 	"ip-blackcage/event"
+	"time"
 )
 
 type config struct {
-	filter   blocker.IBlocker
-	obs      event.IEventReader
-	ipDao    dao.IIPDBDao
-	viewMode bool
+	filter     blocker.IBlocker
+	obs        event.IEventReader
+	ipDao      dao.IIPDBDao
+	viewMode   bool
+	expireTime time.Duration
 
 	//
 	userBlackList []string
@@ -60,5 +62,11 @@ func applyOpts(opts ...Option) *config {
 func WithViewMode(viewmode bool) Option {
 	return func(c *config) {
 		c.viewMode = viewmode
+	}
+}
+
+func WithExpireTime(ts time.Duration) Option {
+	return func(c *config) {
+		c.expireTime = ts
 	}
 }

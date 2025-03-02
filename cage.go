@@ -7,6 +7,7 @@ import (
 	"ip-blackcage/ipevent"
 	"ip-blackcage/model"
 	"ip-blackcage/utils"
+	"time"
 
 	"github.com/xxxsen/common/logutil"
 	"go.uber.org/zap"
@@ -47,8 +48,13 @@ func New(opts ...Option) (*IPBlackCage, error) {
 func (bc *IPBlackCage) readBlackListFromDB(ctx context.Context) ([]string, error) {
 	dbIPList := make([]string, 0, 1024)
 	//DB IP 列表
-	_, err := bc.c.ipDao.ListBlackIP(ctx, 200, func(ctx context.Context, ips []*model.BlackCageTab) error {
+	delims := uint64(time.Now().Add(-1 * bc.c.expireTime).UnixMilli())
+	_, err := bc.c.ipDao.ScanBlackIP(ctx, 200, func(ctx context.Context, ips []*model.BlackCageTab) error {
 		for _, ip := range ips {
+			//仅提取满足条件的黑名单ip
+			if ip.MTime <= delims {
+				continue
+			}
 			dbIPList = append(dbIPList, ip.IP)
 		}
 		return nil
@@ -140,6 +146,7 @@ func (bc *IPBlackCage) Start(ctx context.Context) error {
 }
 
 func (bc *IPBlackCage) startHandleEvent(ctx context.Context, ch <-chan event.IEventData) {
+	unBanTicker := time.NewTimer(1 * time.Minute)
 	for {
 		select {
 		case ev := <-ch:
@@ -147,11 +154,41 @@ func (bc *IPBlackCage) startHandleEvent(ctx context.Context, ch <-chan event.IEv
 				logutil.GetLogger(ctx).Error("handle event failed", zap.Error(err), zap.String("ev_type", ev.EventType()), zap.Int64("ts", ev.Timestamp()))
 				continue
 			}
+		case <-unBanTicker.C:
+			if err := bc.unBanExpire(ctx); err != nil {
+				logutil.GetLogger(ctx).Error("do unban expire failed", zap.Error(err))
+				continue
+			}
 		case <-bc.done:
 			logutil.GetLogger(ctx).Debug("event loop exit")
 			return
 		}
 	}
+}
+
+func (bc *IPBlackCage) unBanExpire(ctx context.Context) error {
+	delims := uint64(time.Now().Add(-1 * bc.c.expireTime).UnixMilli())
+	ips, err := bc.c.ipDao.ListBlackIP(ctx, &model.ListBlackIPCondition{
+		MtimeBetween: []uint64{0, delims},
+	}, 0, 100)
+	if err != nil {
+		return err
+	}
+	for _, ip := range ips {
+		logger := logutil.GetLogger(ctx).With(zap.String("ip", ip.IP),
+			zap.Int64("scan_count", ip.Counter),
+			zap.Int64("last_visit", int64(ip.MTime)))
+		if err := bc.c.filter.UnBanIP(ctx, ip.IP); err != nil {
+			logger.Error("unban ip failed", zap.Error(err))
+			continue
+		}
+		if _, err := bc.c.ipDao.DelBlackIP(ctx, ip.IP); err != nil {
+			logger.Error("remove black ip from db failed", zap.Error(err))
+			continue
+		}
+		logger.Info("unban ip succ")
+	}
+	return nil
 }
 
 func (bc *IPBlackCage) handleOneEvent(ctx context.Context, ev event.IEventData) error {

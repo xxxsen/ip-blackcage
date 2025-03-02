@@ -33,7 +33,7 @@ func TestIPDBDao(t *testing.T) {
 	}
 	{ //读取全列表
 		limit := 1
-		cnt, err := d.ListBlackIP(ctx, limit, func(ctx context.Context, ips []*model.BlackCageTab) error {
+		cnt, err := d.ScanBlackIP(ctx, limit, func(ctx context.Context, ips []*model.BlackCageTab) error {
 			for _, ip := range ips {
 				t.Logf("recv ip item:%v", *ip)
 				assert.Equal(t, int64(2), ip.Counter)

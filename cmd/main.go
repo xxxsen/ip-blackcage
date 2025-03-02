@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	_ "github.com/glebarez/go-sqlite"
 	"github.com/xxxsen/common/logger"
@@ -85,6 +86,7 @@ func main() {
 		ipblackcage.WithUserIPBlackList(ublist),
 		ipblackcage.WithUserIPWhiteList(uwlist),
 		ipblackcage.WithViewMode(c.ViewMode),
+		ipblackcage.WithExpireTime(time.Duration(c.BanTime)*time.Second),
 	)
 	if err != nil {
 		logkit.Fatal("init cage failed", zap.Error(err))

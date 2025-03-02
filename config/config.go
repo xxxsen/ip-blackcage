@@ -23,6 +23,7 @@ type Config struct {
 	UserIPBlackListDir string           `json:"user_ip_black_list_dir"`
 	UserIPWhiteListDir string           `json:"user_ip_white_list_dir"`
 	ViewMode           bool             `json:"view_mode"`
+	BanTime            uint64           `json:"ban_time"`
 }
 
 func (c *Config) DecodePortList() ([]uint16, error) {
@@ -59,7 +60,9 @@ func Parse(f string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &Config{}
+	c := &Config{
+		BanTime: 3 * 30 * 86400, // 90d
+	}
 	if err := json.Unmarshal(raw, c); err != nil {
 		return nil, err
 	}

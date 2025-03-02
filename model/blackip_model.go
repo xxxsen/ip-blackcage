@@ -8,3 +8,7 @@ type BlackCageTab struct {
 	IP      string `json:"ip"`
 	Counter int64  `json:"counter"`
 }
+
+type ListBlackIPCondition struct {
+	MtimeBetween []uint64
+}

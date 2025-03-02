@@ -2,11 +2,13 @@ package dao
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"ip-blackcage/dao/db"
+	"ip-blackcage/dao/dbkit"
 	"ip-blackcage/model"
 	"time"
+
+	"github.com/didi/gendry/builder"
 )
 
 type ListBlackIPCallback func(ctx context.Context, ips []*model.BlackCageTab) error
@@ -16,7 +18,8 @@ type IIPDBDao interface {
 	IncrBlackIPVisit(ctx context.Context, ip string) error
 	GetBlackIP(ctx context.Context, ip string) (*model.BlackCageTab, bool, error)
 	DelBlackIP(ctx context.Context, ip string) (bool, error)
-	ListBlackIP(ctx context.Context, limit int, cb ListBlackIPCallback) (int64, error)
+	ScanBlackIP(ctx context.Context, limit int, cb ListBlackIPCallback) (int64, error)
+	ListBlackIP(ctx context.Context, cond *model.ListBlackIPCondition, offset, limit int64) ([]*model.BlackCageTab, error)
 }
 
 type ipDBDaoImpl struct {
@@ -80,26 +83,32 @@ func (d *ipDBDaoImpl) IncrBlackIPVisit(ctx context.Context, ip string) error {
 }
 
 func (d *ipDBDaoImpl) GetBlackIP(ctx context.Context, ip string) (*model.BlackCageTab, bool, error) {
-	sql := fmt.Sprintf("select id, remark, ctime, mtime, ip, counter from %s where ip = ? limit 1", d.table())
+	where := map[string]interface{}{
+		"ip":     ip,
+		"_limit": []uint{0, 1},
+	}
+	rs := make([]*model.BlackCageTab, 0, 1)
 	client := d.getClient(ctx)
-	rows, err := client.QueryContext(ctx, sql, ip)
-	if err != nil {
+	if err := dbkit.SimpleQuery(ctx, client, d.table(), where, &rs, dbkit.ScanWithTagName("json")); err != nil {
 		return nil, false, err
 	}
-	res, err := d.scanIPBlackCageRows(rows)
-	if err != nil {
-		return nil, false, err
-	}
-	if len(res) == 0 {
+	if len(rs) == 0 {
 		return nil, false, nil
 	}
-	return res[0], true, nil
+	return rs[0], true, nil
 }
 
 func (d *ipDBDaoImpl) DelBlackIP(ctx context.Context, ip string) (bool, error) {
-	sql := fmt.Sprintf("delete from %s where ip = ?", d.table())
+	where := map[string]interface{}{
+		"ip":     ip,
+		"_limit": []uint{0, 1},
+	}
+	sql, args, err := builder.BuildDelete(d.table(), where)
+	if err != nil {
+		return false, fmt.Errorf("build delete failed, err:%w", err)
+	}
 	client := d.getClient(ctx)
-	rs, err := client.ExecContext(ctx, sql, ip)
+	rs, err := client.ExecContext(ctx, sql, args...)
 	if err != nil {
 		return false, err
 	}
@@ -110,7 +119,26 @@ func (d *ipDBDaoImpl) DelBlackIP(ctx context.Context, ip string) (bool, error) {
 	return cnt > 0, nil
 }
 
-func (d *ipDBDaoImpl) ListBlackIP(ctx context.Context, limit int, cb ListBlackIPCallback) (int64, error) {
+func (d *ipDBDaoImpl) ListBlackIP(ctx context.Context,
+	cond *model.ListBlackIPCondition, offset, limit int64) ([]*model.BlackCageTab, error) {
+	if cond.MtimeBetween != nil && len(cond.MtimeBetween) != 2 {
+		return nil, fmt.Errorf("mtime_between should has 2 elements, get:%d", len(cond.MtimeBetween))
+	}
+	where := map[string]interface{}{
+		"_limit": []uint{uint(offset), uint(limit)},
+	}
+	if cond.MtimeBetween != nil {
+		where["mtime >="] = cond.MtimeBetween[0]
+		where["mtime <"] = cond.MtimeBetween[1]
+	}
+	rs := make([]*model.BlackCageTab, 0, limit)
+	if err := dbkit.SimpleQuery(ctx, d.getClient(ctx), d.table(), where, &rs, dbkit.ScanWithTagName("json")); err != nil {
+		return nil, err
+	}
+	return rs, nil
+}
+
+func (d *ipDBDaoImpl) ScanBlackIP(ctx context.Context, limit int, cb ListBlackIPCallback) (int64, error) {
 	var lastid int64 = 0
 	var total int64
 	for {
@@ -133,27 +161,14 @@ func (d *ipDBDaoImpl) ListBlackIP(ctx context.Context, limit int, cb ListBlackIP
 }
 
 func (d *ipDBDaoImpl) selectByScan(ctx context.Context, id int64, limit int) ([]*model.BlackCageTab, error) {
-	sql := fmt.Sprintf(`select id, remark, ctime, mtime, ip, counter from %s where id > ? order by id asc limit %d`, d.table(), limit)
+	where := map[string]interface{}{
+		"id >":     id,
+		"_orderby": "id asc",
+		"_limit":   []uint{0, uint(limit)},
+	}
 	client := d.getClient(ctx)
-	rows, err := client.QueryContext(ctx, sql, id)
-	if err != nil {
-		return nil, err
-	}
-	return d.scanIPBlackCageRows(rows)
-}
-
-func (d *ipDBDaoImpl) scanIPBlackCageRows(rows *sql.Rows) ([]*model.BlackCageTab, error) {
-	defer rows.Close()
-	rs := make([]*model.BlackCageTab, 0, 1)
-	for rows.Next() {
-		tab := &model.BlackCageTab{}
-		if err := rows.Scan(&tab.ID, &tab.Remark, &tab.CTime, &tab.MTime, &tab.IP, &tab.Counter); err != nil {
-			return nil, err
-		}
-		rs = append(rs, tab)
-	}
-
-	if err := rows.Err(); err != nil {
+	rs := make([]*model.BlackCageTab, 0, limit)
+	if err := dbkit.SimpleQuery(ctx, client, d.table(), where, &rs, dbkit.ScanWithTagName("json")); err != nil {
 		return nil, err
 	}
 	return rs, nil
