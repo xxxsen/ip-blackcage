@@ -71,10 +71,8 @@ func (f *defaultBlocker) ensureIPSet(ctx context.Context, setname string, ips []
 	if err := f.set.Create(ctx, tmpset, ipset.SetTypeHashNet, ipset.WithExist()); err != nil {
 		return fmt.Errorf("create ip tmp set failed, err:%w", err)
 	}
-	for _, ip := range ips {
-		if err := f.set.Add(ctx, tmpset, ip, ipset.WithExist()); err != nil {
-			return fmt.Errorf("add ip:%s to set failed, err:%w", ip, err)
-		}
+	if err := f.set.Restore(ctx, tmpset, ips); err != nil {
+		return fmt.Errorf("restore ipset failed, err:%w", err)
 	}
 	if err := f.set.Swap(ctx, tmpset, setname); err != nil {
 		return fmt.Errorf("swap black set failed, err:%w", err)
