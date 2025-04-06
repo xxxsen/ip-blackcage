@@ -1,4 +1,4 @@
-ip-blackcate
+ip-blackcage
 ===
 
 ip黑名单, 用于把扫描ip ban掉。
