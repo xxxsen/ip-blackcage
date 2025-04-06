@@ -3,12 +3,13 @@ package dao
 import (
 	"context"
 	"fmt"
-	"ip-blackcage/dao/db"
-	"ip-blackcage/dao/dbkit"
+	"ip-blackcage/db"
 	"ip-blackcage/model"
 	"time"
 
 	"github.com/didi/gendry/builder"
+	"github.com/xxxsen/common/database"
+	"github.com/xxxsen/common/database/dbkit"
 )
 
 type ListBlackIPCallback func(ctx context.Context, ips []*model.BlackCageTab) error
@@ -23,12 +24,12 @@ type IIPDBDao interface {
 }
 
 type ipDBDaoImpl struct {
-	dbc func(ctx context.Context) db.IDatabase
+	dbc func(ctx context.Context) database.IDatabase
 }
 
 func NewIPDBDao() (IIPDBDao, error) {
 	impl := &ipDBDaoImpl{
-		dbc: GetIPDB,
+		dbc: db.GetClient,
 	}
 	if err := impl.init(); err != nil {
 		return nil, err
@@ -36,7 +37,7 @@ func NewIPDBDao() (IIPDBDao, error) {
 	return impl, nil
 }
 
-func (d *ipDBDaoImpl) getClient(ctx context.Context) db.IDatabase {
+func (d *ipDBDaoImpl) getClient(ctx context.Context) database.IDatabase {
 	return d.dbc(ctx)
 }
 

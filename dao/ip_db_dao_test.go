@@ -2,22 +2,19 @@ package dao
 
 import (
 	"context"
-	"database/sql"
+	"ip-blackcage/db"
 	"ip-blackcage/model"
 	"os"
 	"testing"
 
 	_ "github.com/glebarez/go-sqlite"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestIPDBDao(t *testing.T) {
-	path := "/tmp/db_" + uuid.NewString()
+	path := "/tmp/ip_db_test.db"
 	defer os.Remove(path)
-	dbinst, err := sql.Open("sqlite", path)
-	assert.NoError(t, err)
-	SetIPDB(dbinst)
+	db.InitDB(path)
 
 	d, err := NewIPDBDao()
 	assert.NoError(t, err)

@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"flag"
 	ipblackcage "ip-blackcage"
 	"ip-blackcage/blocker"
 	"ip-blackcage/config"
 	"ip-blackcage/dao"
+	"ip-blackcage/db"
 	"ip-blackcage/ipevent"
 	"ip-blackcage/route"
 	"ip-blackcage/utils"
@@ -145,12 +145,7 @@ func resolveUserFile(dir string, prefix string) ([]string, error) {
 }
 
 func initDB(f string) error {
-	db, err := sql.Open("sqlite", f)
-	if err != nil {
-		return err
-	}
-	dao.SetIPDB(db)
-	return nil
+	return db.InitDB(f)
 }
 
 func waitSignalAndExit(ctx context.Context, cage *ipblackcage.IPBlackCage) {
