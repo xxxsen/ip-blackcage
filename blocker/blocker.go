@@ -17,6 +17,8 @@ const (
 	defaultFilterTable     = "filter"
 	defaultCageChain       = "ip-blackcage-chain"
 	defaultDockerUserChain = "DOCKER-USER"
+	defaultInputChain      = "INPUT"
+	defaultForwardChain    = "FORWARD"
 )
 
 type IBlocker interface {
@@ -86,7 +88,7 @@ func (f *defaultBlocker) ensureIPSet(ctx context.Context, setname string, ips []
 	return nil
 }
 
-func (f *defaultBlocker) ensureInputChain(_ context.Context) error {
+func (f *defaultBlocker) ensureBaseChain(_ context.Context) error {
 	table := defaultFilterTable
 	chain := defaultCageChain
 	blackset := f.getBlackSet()
@@ -127,8 +129,36 @@ func (f *defaultBlocker) ensureInputChain(_ context.Context) error {
 			return fmt.Errorf("create rule:%s failed, err:%w", rule.name, err)
 		}
 	}
-	if err = f.ipt.InsertUnique(table, "INPUT", 1, "-j", chain); err != nil {
-		return fmt.Errorf("inset to input chains failed, err:%w", err)
+	return nil
+}
+
+func (f *defaultBlocker) ensureJumpChain(_ context.Context, srcChain string) error {
+	table := defaultFilterTable
+	chain := defaultCageChain
+	if err := f.ipt.InsertUnique(table, srcChain, 1, "-j", chain); err != nil {
+		return fmt.Errorf("insert chain jump failed, src_chain:%s, err:%w", srcChain, err)
+	}
+	return nil
+}
+
+func (f *defaultBlocker) ensureInputChain(ctx context.Context) error {
+	return f.ensureJumpChain(ctx, defaultInputChain)
+}
+
+func (f *defaultBlocker) ensureForwardChain(ctx context.Context) error {
+	return f.ensureJumpChain(ctx, defaultForwardChain)
+}
+
+func (f *defaultBlocker) deleteJumpChain(ctx context.Context, srcChain string) error {
+	table := defaultFilterTable
+	chain := defaultCageChain
+	if err := f.ipt.DeleteIfExists(table, srcChain, "-j", chain); err != nil {
+		if !strings.Contains(err.Error(), "does not exist") {
+			logutil.GetLogger(ctx).Error("delete chain jump rule failed",
+				zap.String("src_chain", srcChain),
+				zap.Error(err))
+			return err
+		}
 	}
 	return nil
 }
@@ -153,8 +183,14 @@ func (f *defaultBlocker) ensureDockerChain(_ context.Context) error {
 }
 
 func (f *defaultBlocker) ensureIPTable(ctx context.Context) error {
+	if err := f.ensureBaseChain(ctx); err != nil {
+		return fmt.Errorf("ensure base chain failed, err:%w", err)
+	}
 	if err := f.ensureInputChain(ctx); err != nil {
 		return fmt.Errorf("ensure input chain failed, err:%w", err)
+	}
+	if err := f.ensureForwardChain(ctx); err != nil {
+		return fmt.Errorf("ensure forward chain failed, err:%w", err)
 	}
 	if err := f.ensureDockerChain(ctx); err != nil {
 		return fmt.Errorf("ensure docker chain failed, err:%w", err)
@@ -174,13 +210,11 @@ func (f *defaultBlocker) Destroy(ctx context.Context) error {
 			return err
 		}
 	}
-	//移除input链上的处理流程
-	if err := f.ipt.DeleteIfExists(table, "INPUT", "-j", chain); err != nil {
-		if !strings.Contains(err.Error(), "does not exist") {
-			logutil.GetLogger(ctx).Error("delete input chain jump rule failed", zap.Error(err))
-			return err
-		}
-		//不存在的错误直接忽略
+	if err := f.deleteJumpChain(ctx, defaultInputChain); err != nil {
+		return err
+	}
+	if err := f.deleteJumpChain(ctx, defaultForwardChain); err != nil {
+		return err
 	}
 	if err := f.ipt.ClearAndDeleteChain(table, chain); err != nil {
 		return fmt.Errorf("clean and delete chain failed, err:%w", err)
